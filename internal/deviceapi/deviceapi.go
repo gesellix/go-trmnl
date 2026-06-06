@@ -5,10 +5,16 @@ package deviceapi
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
+	"github.com/gesellix/go-trmnl/internal/playlist"
+	"github.com/gesellix/go-trmnl/internal/plugins"
 	"github.com/gesellix/go-trmnl/internal/render"
 	"github.com/gesellix/go-trmnl/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -23,6 +29,8 @@ type Handler struct {
 	store      *store.Store
 	baseURL    string
 	uploadsDir string
+	assetsDir  string
+	renderer   *render.Renderer
 
 	placeholderOnce sync.Once
 	placeholderErr  error
@@ -32,7 +40,109 @@ type Handler struct {
 // build image URLs; uploadsDir is where rendered images live and are served
 // from at /uploads.
 func New(st *store.Store, baseURL, uploadsDir string) *Handler {
-	return &Handler{store: st, baseURL: baseURL, uploadsDir: uploadsDir}
+	return &Handler{
+		store:      st,
+		baseURL:    baseURL,
+		uploadsDir: uploadsDir,
+		assetsDir:  filepath.Join(uploadsDir, "assets"),
+		renderer:   render.NewRenderer(uploadsDir),
+	}
+}
+
+// screenImage holds the served image's URL filename and its bare stem.
+type screenImage struct {
+	urlName string // e.g. "<hash>.bmp" or "placeholder.bmp"
+	stem    string // e.g. "<hash>" or "placeholder"
+}
+
+// currentImage selects the device's next screen, renders it if needed, and
+// returns the served image. It falls back to the placeholder when no screen is
+// assigned or rendering fails.
+func (h *Handler) currentImage(ctx context.Context, d *store.Device) screenImage {
+	screen, err := playlist.NextScreen(h.store, d)
+	if err != nil { // ErrNoScreen or a store error: fall back gracefully
+		name, _ := h.ensurePlaceholder()
+		return screenImage{urlName: name, stem: trimExt(name)}
+	}
+	hash, rerr := h.renderScreen(ctx, d, screen)
+	if rerr != nil {
+		name, _ := h.ensurePlaceholder()
+		return screenImage{urlName: name, stem: trimExt(name)}
+	}
+	return screenImage{urlName: hash + ".bmp", stem: hash}
+}
+
+// renderScreen returns the content hash of the screen's current image,
+// rendering (and caching) it when the cache is stale or missing.
+func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *store.Screen) (string, error) {
+	pluginRow, err := h.store.GetPlugin(screen.PluginID)
+	if err != nil {
+		return "", err
+	}
+	p, ok := plugins.Get(pluginRow.Type)
+	if !ok {
+		return "", errors.New("unknown plugin type " + pluginRow.Type)
+	}
+
+	if hash, ok := h.cachedHash(screen, p.DefaultRefresh()); ok {
+		return hash, nil
+	}
+
+	in := plugins.RenderInput{
+		Device:    d,
+		Screen:    screen,
+		Settings:  json.RawMessage(screen.SettingsJSON),
+		Now:       time.Now(),
+		Width:     render.Width,
+		Height:    render.Height,
+		AssetsDir: h.assetsDir,
+	}
+	model, err := p.DataModel(ctx, in)
+	if err != nil {
+		return "", err
+	}
+	img, err := p.Render(ctx, in, model)
+	if err != nil {
+		return "", err
+	}
+	res, err := h.renderer.Process(img, h.ditherMode())
+	if err != nil {
+		return "", err
+	}
+	_ = h.store.SetScreenRendered(screen.ID, res.Hash)
+	return res.Hash, nil
+}
+
+// cachedHash returns the screen's cached hash if it is still fresh and the file
+// is present on disk.
+func (h *Handler) cachedHash(screen *store.Screen, ttl time.Duration) (string, bool) {
+	if !screen.RenderedHash.Valid {
+		return "", false
+	}
+	if _, err := os.Stat(filepath.Join(h.uploadsDir, screen.RenderedHash.String+".bmp")); err != nil {
+		return "", false
+	}
+	if ttl > 0 && screen.RenderedAt.Valid {
+		if time.Since(time.Unix(screen.RenderedAt.Int64, 0)) >= ttl {
+			return "", false
+		}
+	}
+	return screen.RenderedHash.String, true
+}
+
+// ditherMode reads the configured dithering mode, defaulting to Floyd-Steinberg.
+func (h *Handler) ditherMode() render.Mode {
+	if v, ok, _ := h.store.GetSetting("dither_mode"); ok {
+		return render.ParseMode(v)
+	}
+	return render.FloydSteinberg
+}
+
+func trimExt(name string) string {
+	if i := len(name) - len(filepath.Ext(name)); i >= 0 {
+		return name[:i]
+	}
+	return name
 }
 
 // Routes mounts the device endpoints onto r under /api.

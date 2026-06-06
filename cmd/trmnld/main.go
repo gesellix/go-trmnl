@@ -15,6 +15,10 @@ import (
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
+
+	// Register built-in screen plugins.
+	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
+	_ "github.com/gesellix/go-trmnl/internal/plugins/staticimage"
 )
 
 func main() {

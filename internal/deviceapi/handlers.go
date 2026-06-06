@@ -74,17 +74,12 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name, err := h.ensurePlaceholder()
-	if err != nil {
-		httpx.WriteProblem(w, http.StatusInternalServerError, "/problem#internal",
-			"internal_server_error", "Failed to prepare image.", r.URL.Path, nil)
-		return
-	}
+	img := h.currentImage(r.Context(), d)
 
 	httpx.WriteJSON(w, http.StatusOK, displayResponse{
 		Status:             0,
-		ImageURL:           h.imageURL(name),
-		Filename:           strings.TrimSuffix(name, ".bmp"),
+		ImageURL:           h.imageURL(img.urlName),
+		Filename:           img.stem,
 		RefreshRate:        d.RefreshRate,
 		UpdateFirmware:     false,
 		FirmwareURL:        nil,
