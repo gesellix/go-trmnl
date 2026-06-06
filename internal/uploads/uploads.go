@@ -54,6 +54,39 @@ func Sweep(dir string, keep map[string]bool, olderThan time.Duration) (int, erro
 	return removed, nil
 }
 
+// SweepAssets removes files directly in dir (the uploaded-asset store) whose
+// exact name is not in keep and that are older than now-olderThan. A missing
+// directory is treated as empty. Unlike Sweep, assets are matched by full file
+// name (they carry arbitrary extensions), not by content-hash stem.
+func SweepAssets(dir string, keep map[string]bool, olderThan time.Duration) (int, error) {
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	cutoff := time.Now().Add(-olderThan)
+
+	removed := 0
+	for _, e := range entries {
+		if e.IsDir() || keep[e.Name()] {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(cutoff) {
+			continue
+		}
+		if os.Remove(filepath.Join(dir, e.Name())) == nil {
+			removed++
+		}
+	}
+	return removed, nil
+}
+
 // stem strips a rendered-image extension so "<hash>.bmp" and "<hash>.png" both
 // map to "<hash>". Names without those extensions (e.g. atomic-write temp files
 // like "<hash>.bmp.tmp-123") return unchanged and so are eligible for pruning.

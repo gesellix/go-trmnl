@@ -290,6 +290,26 @@ func TestDeleteDeviceCascadesLogs(t *testing.T) {
 	}
 }
 
+func TestScreenSettingsByPluginType(t *testing.T) {
+	st := openTest(t)
+
+	pgImg, _ := st.CreatePlugin("staticimage", "img")
+	st.CreateScreen(pgImg.ID, "img", `{"file":"a.png"}`)
+	pgClock, _ := st.CreatePlugin("clock", "c")
+	st.CreateScreen(pgClock.ID, "c", `{"use_24h":true}`)
+
+	got, err := st.ScreenSettings("staticimage")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != `{"file":"a.png"}` {
+		t.Errorf("staticimage settings = %v, want one image screen", got)
+	}
+	if other, _ := st.ScreenSettings("weather"); len(other) != 0 {
+		t.Errorf("weather settings = %v, want none", other)
+	}
+}
+
 func TestPruneLogs(t *testing.T) {
 	st := openTest(t)
 	d := newDevice(t, st, "AA:BB:CC:DD:EE:08")

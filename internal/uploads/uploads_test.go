@@ -60,3 +60,43 @@ func TestSweep(t *testing.T) {
 		}
 	}
 }
+
+func TestSweepAssets(t *testing.T) {
+	dir := t.TempDir()
+	old := time.Now().Add(-2 * time.Hour)
+	write := func(name string, aged bool) {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if aged {
+			if err := os.Chtimes(p, old, old); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	write("used.jpg", true)    // referenced -> kept
+	write("orphan.png", true)  // unreferenced, old -> removed
+	write("recent.gif", false) // unreferenced but recent -> kept (grace)
+
+	removed, err := uploads.SweepAssets(dir, map[string]bool{"used.jpg": true}, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 1 {
+		t.Fatalf("removed = %d, want 1", removed)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "orphan.png")); err == nil {
+		t.Error("orphan.png should have been removed")
+	}
+	for _, keep := range []string{"used.jpg", "recent.gif"} {
+		if _, err := os.Stat(filepath.Join(dir, keep)); err != nil {
+			t.Errorf("%s should have been kept", keep)
+		}
+	}
+
+	// Missing directory is a no-op, not an error.
+	if n, err := uploads.SweepAssets(filepath.Join(dir, "nope"), nil, time.Hour); err != nil || n != 0 {
+		t.Errorf("missing dir: n=%d err=%v, want 0/nil", n, err)
+	}
+}

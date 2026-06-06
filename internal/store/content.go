@@ -121,6 +121,26 @@ func (s *Store) ActiveRenderHashes() ([]string, error) {
 	return out, rows.Err()
 }
 
+// ScreenSettings returns the settings JSON of every screen whose plugin is of
+// the given type. Used to discover which uploaded assets are still referenced.
+func (s *Store) ScreenSettings(pluginType string) ([]string, error) {
+	rows, err := s.db.Query(`SELECT s.settings_json FROM screens s
+		JOIN plugins p ON p.id = s.plugin_id WHERE p.type = ?`, pluginType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var j string
+		if err := rows.Scan(&j); err != nil {
+			return nil, err
+		}
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
 // ClearScreenRendered forces a screen to re-render on next request.
 func (s *Store) ClearScreenRendered(id int64) error {
 	_, err := s.db.Exec(`UPDATE screens SET rendered_hash = NULL, rendered_at = NULL WHERE id = ?`, id)

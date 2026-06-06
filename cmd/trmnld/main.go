@@ -4,10 +4,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -106,6 +108,7 @@ func runMaintenance(ctx context.Context, st *store.Store, uploadsDir string, cle
 		case <-ticker.C:
 			if cleanupInterval > 0 {
 				sweepCache(st, uploadsDir, cleanupInterval)
+				sweepAssets(st, filepath.Join(uploadsDir, "assets"), cleanupInterval)
 			}
 			if logRetention > 0 {
 				if n, err := st.PruneLogs(logRetention); err != nil {
@@ -136,5 +139,32 @@ func sweepCache(st *store.Store, uploadsDir string, grace time.Duration) {
 	}
 	if removed > 0 {
 		log.Printf("maintenance: removed %d stale cache file(s)", removed)
+	}
+}
+
+// sweepAssets removes uploaded image assets no longer referenced by any
+// static-image screen (e.g. orphaned by a re-upload or a deleted screen).
+func sweepAssets(st *store.Store, assetsDir string, grace time.Duration) {
+	settings, err := st.ScreenSettings("staticimage")
+	if err != nil {
+		log.Printf("maintenance: list staticimage settings: %v", err)
+		return
+	}
+	keep := make(map[string]bool, len(settings))
+	for _, s := range settings {
+		var v struct {
+			File string `json:"file"`
+		}
+		if json.Unmarshal([]byte(s), &v) == nil && v.File != "" {
+			keep[filepath.Base(v.File)] = true
+		}
+	}
+	removed, err := uploads.SweepAssets(assetsDir, keep, grace)
+	if err != nil {
+		log.Printf("maintenance: sweep assets: %v", err)
+		return
+	}
+	if removed > 0 {
+		log.Printf("maintenance: removed %d unused asset(s)", removed)
 	}
 }
