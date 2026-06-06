@@ -22,6 +22,11 @@ type Device struct {
 	WifiStatus      sql.NullString
 	LastSeenAt      sql.NullInt64
 	CreatedAt       int64
+	// Firmware/special-function controls surfaced in /api/display.
+	FirmwareUpdate  bool
+	FirmwareURL     sql.NullString
+	ResetFirmware   bool
+	SpecialFunction sql.NullString
 }
 
 // DeviceLog is a single log entry reported by a device.

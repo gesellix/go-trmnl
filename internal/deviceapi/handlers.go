@@ -76,18 +76,36 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 
 	img := h.currentImage(r.Context(), d)
 
+	special := "none"
+	if d.SpecialFunction.Valid && d.SpecialFunction.String != "" {
+		special = d.SpecialFunction.String
+	}
+	var firmwareURL *string
+	if d.FirmwareUpdate && d.FirmwareURL.Valid {
+		firmwareURL = &d.FirmwareURL.String
+	}
+
 	httpx.WriteJSON(w, http.StatusOK, displayResponse{
 		Status:             0,
 		ImageURL:           h.imageURL(img.urlName),
 		Filename:           img.stem,
 		RefreshRate:        d.RefreshRate,
-		UpdateFirmware:     false,
-		FirmwareURL:        nil,
-		ResetFirmware:      false,
-		SpecialFunction:    "none",
+		UpdateFirmware:     d.FirmwareUpdate && d.FirmwareURL.Valid,
+		FirmwareURL:        firmwareURL,
+		ResetFirmware:      d.ResetFirmware,
+		SpecialFunction:    special,
 		ImageURLTimeout:    0,
 		TemperatureProfile: "default",
 	})
+
+	// Firmware update and reset are one-shot: clear them after serving so the
+	// device does not loop on them.
+	if d.FirmwareUpdate {
+		_ = h.store.ClearFirmwareUpdate(d.ID)
+	}
+	if d.ResetFirmware {
+		_ = h.store.ClearResetFirmware(d.ID)
+	}
 }
 
 // logRequest is the body of POST /api/log.

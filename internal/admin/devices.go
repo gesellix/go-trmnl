@@ -65,6 +65,36 @@ func (h *Handler) DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if fn := r.FormValue("special_function"); fn != "" {
+		_ = h.store.SetSpecialFunction(id, fn)
+	}
+	http.Redirect(w, r, "/admin/devices/"+chiID(r), http.StatusFound)
+}
+
+// DeviceFirmware queues an OTA firmware update for the device's next poll.
+func (h *Handler) DeviceFirmware(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	url := r.FormValue("firmware_url")
+	if url == "" {
+		http.Error(w, "firmware_url is required", http.StatusBadRequest)
+		return
+	}
+	_ = h.store.QueueFirmwareUpdate(id, url)
+	http.Redirect(w, r, "/admin/devices/"+chiID(r), http.StatusFound)
+}
+
+// DeviceFirmwareCancel cancels a pending firmware update.
+func (h *Handler) DeviceFirmwareCancel(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	_ = h.store.ClearFirmwareUpdate(id)
 	http.Redirect(w, r, "/admin/devices/"+chiID(r), http.StatusFound)
 }
 

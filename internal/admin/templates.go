@@ -49,6 +49,7 @@ func mustParseTemplates() *templateSet {
 			}
 			return v
 		},
+		"slice": func(vals ...string) []string { return vals },
 	}
 	ts := &templateSet{tmpls: map[string]*template.Template{}}
 	for _, p := range pages {

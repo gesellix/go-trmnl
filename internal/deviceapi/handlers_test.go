@@ -169,6 +169,49 @@ func TestDisplay(t *testing.T) {
 	})
 }
 
+func TestDisplayFirmwareAndSpecialFunction(t *testing.T) {
+	ts, st := newTestServer(t)
+	do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "").Body.Close()
+	d, _ := st.GetDeviceByMAC(testMAC)
+
+	if err := st.QueueFirmwareUpdate(d.ID, "http://test.local/fw/1.2.3.bin"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSpecialFunction(d.ID, "sleep"); err != nil {
+		t.Fatal(err)
+	}
+
+	type body struct {
+		UpdateFirmware  bool    `json:"update_firmware"`
+		FirmwareURL     *string `json:"firmware_url"`
+		SpecialFunction string  `json:"special_function"`
+	}
+	get := func() body {
+		resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{"ID": testMAC, "Access-Token": d.APIKey}, "")
+		defer resp.Body.Close()
+		var b body
+		json.NewDecoder(resp.Body).Decode(&b)
+		return b
+	}
+
+	first := get()
+	if !first.UpdateFirmware || first.FirmwareURL == nil || *first.FirmwareURL != "http://test.local/fw/1.2.3.bin" {
+		t.Fatalf("first display: update not delivered: %+v", first)
+	}
+	if first.SpecialFunction != "sleep" {
+		t.Errorf("special_function = %q, want sleep", first.SpecialFunction)
+	}
+
+	// One-shot: firmware update cleared on the next poll; special function persists.
+	second := get()
+	if second.UpdateFirmware {
+		t.Errorf("firmware update should be one-shot, still set on second poll")
+	}
+	if second.SpecialFunction != "sleep" {
+		t.Errorf("special_function should persist, got %q", second.SpecialFunction)
+	}
+}
+
 func TestLog(t *testing.T) {
 	ts, st := newTestServer(t)
 	do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "").Body.Close()

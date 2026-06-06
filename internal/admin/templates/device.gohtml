@@ -43,8 +43,30 @@
       {{end}}
     </select>
   </label>
+  <label>Special function
+    {{$fn := def "none" (ns $d.SpecialFunction)}}
+    <select name="special_function">
+      {{range $opt := slice "none" "identify" "sleep" "add_wifi" "restart_playlist" "rewind" "send_to_me"}}
+        <option value="{{$opt}}" {{if eq $fn $opt}}selected{{end}}>{{$opt}}</option>
+      {{end}}
+    </select>
+  </label>
   <button type="submit">Save</button>
 </form>
+
+<h2>Firmware</h2>
+<p class="muted">Current version: {{def "&mdash;" (ns $d.FWVersion)}}</p>
+{{if $d.FirmwareUpdate}}
+  <p>Update <strong>pending</strong>{{if $d.FirmwareURL.Valid}} from <code>{{ns $d.FirmwareURL}}</code>{{end}}, delivered on the next poll.</p>
+  <form method="post" action="/admin/devices/{{$d.ID}}/firmware/cancel">
+    <button type="submit">Cancel pending update</button>
+  </form>
+{{else}}
+  <form method="post" action="/admin/devices/{{$d.ID}}/firmware">
+    <label>Firmware URL (.bin) <input type="text" name="firmware_url" placeholder="https://.../firmware.bin"></label>
+    <button type="submit">Queue OTA update</button>
+  </form>
+{{end}}
 
 <p>
   <a href="/admin/devices/{{$d.ID}}/logs">View logs</a>

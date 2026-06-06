@@ -7,13 +7,15 @@ import (
 
 const deviceColumns = `id, mac, api_key, friendly_id, name, model, fw_version,
 	width, height, refresh_rate, playlist_id, playlist_cursor,
-	battery_voltage, battery_charging, rssi, wifi_status, last_seen_at, created_at`
+	battery_voltage, battery_charging, rssi, wifi_status, last_seen_at, created_at,
+	firmware_update, firmware_url, reset_firmware, special_function`
 
 func scanDevice(row interface{ Scan(...any) error }) (*Device, error) {
 	var d Device
 	err := row.Scan(&d.ID, &d.MAC, &d.APIKey, &d.FriendlyID, &d.Name, &d.Model, &d.FWVersion,
 		&d.Width, &d.Height, &d.RefreshRate, &d.PlaylistID, &d.PlaylistCursor,
-		&d.BatteryVoltage, &d.BatteryCharging, &d.RSSI, &d.WifiStatus, &d.LastSeenAt, &d.CreatedAt)
+		&d.BatteryVoltage, &d.BatteryCharging, &d.RSSI, &d.WifiStatus, &d.LastSeenAt, &d.CreatedAt,
+		&d.FirmwareUpdate, &d.FirmwareURL, &d.ResetFirmware, &d.SpecialFunction)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -111,6 +113,40 @@ func (s *Store) UpdateDeviceSettings(id int64, name string, refreshRate int, pla
 // SetPlaylistCursor stores the round-robin cursor for a device.
 func (s *Store) SetPlaylistCursor(id int64, cursor int) error {
 	_, err := s.db.Exec(`UPDATE devices SET playlist_cursor = ? WHERE id = ?`, cursor, id)
+	return err
+}
+
+// QueueFirmwareUpdate marks a firmware update pending for the device, to be
+// delivered on its next display poll.
+func (s *Store) QueueFirmwareUpdate(id int64, firmwareURL string) error {
+	_, err := s.db.Exec(`UPDATE devices SET firmware_update = 1, firmware_url = ? WHERE id = ?`, firmwareURL, id)
+	return err
+}
+
+// ClearFirmwareUpdate cancels a pending firmware update.
+func (s *Store) ClearFirmwareUpdate(id int64) error {
+	_, err := s.db.Exec(`UPDATE devices SET firmware_update = 0 WHERE id = ?`, id)
+	return err
+}
+
+// QueueResetFirmware marks a one-shot firmware reset pending for the device.
+func (s *Store) QueueResetFirmware(id int64) error {
+	_, err := s.db.Exec(`UPDATE devices SET reset_firmware = 1 WHERE id = ?`, id)
+	return err
+}
+
+// ClearResetFirmware clears a pending firmware reset.
+func (s *Store) ClearResetFirmware(id int64) error {
+	_, err := s.db.Exec(`UPDATE devices SET reset_firmware = 0 WHERE id = ?`, id)
+	return err
+}
+
+// SetSpecialFunction sets the device's special function (e.g. "none", "sleep").
+func (s *Store) SetSpecialFunction(id int64, fn string) error {
+	if fn == "" {
+		fn = "none"
+	}
+	_, err := s.db.Exec(`UPDATE devices SET special_function = ? WHERE id = ?`, fn, id)
 	return err
 }
 
