@@ -89,19 +89,36 @@ You'll see the dashboard with counts for devices, screens and playlists.
 
 ## 3. Point your TRMNL device at the server
 
-On the device side you set the **custom server / API base URL** to your
-`go-trmnl` base URL (e.g. `http://192.168.1.10:8080`). The firmware appends
-`/api/...` itself, so give it just the base.
+You tell the device to use `go-trmnl` through its Wi-Fi captive portal, under
+**Advanced → Custom Server**. The steps below summarize the official guides;
+refer to them for device-specific details and screenshots:
 
-How you enter that URL depends on your firmware/hardware (it's usually done in
-the Wi-Fi captive portal during onboarding, or baked into a firmware build).
-That part is device-specific, so follow the official instructions:
+- [Enable Wi-Fi pairing mode](https://help.trmnl.com/en/articles/11511577-enable-wifi-pairing-mode)
+- [Connect your device to a (Terminus) BYOS server](https://help.trmnl.com/en/articles/12263392-connect-your-device-to-terminus-byos)
 
-- [BYOS overview](https://docs.trmnl.com/go/diy/byos)
-- [Firmware repo & build instructions](https://github.com/usetrmnl/firmware)
+**a. Put the device into Wi-Fi pairing mode.**
 
-> Tip: you can simulate a device from any machine on the LAN with `curl` to
-> confirm the server is reachable before involving hardware:
+- *TRMNL OG (7.5")*: hold the **boot button** on the back for **6–8 seconds**,
+  then release. If it doesn't enter pairing mode, try holding **15–20 seconds**.
+- *TRMNL X (10.3")*: hold **both ends of the touchbar** until the screen blinks,
+  then **hold the middle** of the touchbar to confirm entering pairing mode.
+
+**b. Join the device's Wi-Fi.** From your phone or laptop, connect to the
+Wi-Fi network named **`TRMNL`**. A captive-portal page opens automatically.
+
+**c. Set the custom server.** In the portal, go to **Advanced → Custom Server →
+Yes**, then enter your `go-trmnl` base URL in the format
+`http://<your-lan-ip>:8080` — **no trailing slash** (e.g.
+`http://192.168.1.10:8080`). The firmware appends `/api/...` itself, so enter
+just the base URL.
+
+**d. Connect to your Wi-Fi.** Tap **Back to Wi-Fi**, choose your network's SSID,
+enter its password, and **Connect**. The device saves the credentials, reboots
+onto your network, and calls your server. (Wi-Fi credentials are stored on the
+device only.)
+
+> **Verify the server first (optional but recommended).** Before involving
+> hardware, simulate a device from any machine on the LAN:
 >
 > ```sh
 > curl -H "ID: AA:BB:CC:DD:EE:FF" http://<your-lan-ip>:8080/api/setup
@@ -214,6 +231,8 @@ text/sharp UI. For more on preparing images for e-ink, see the official
 (go-trmnl does the conversion in pure Go, but the principles are the same).
 
 **Device-side / firmware issues** (Wi-Fi onboarding, setting the custom server
-URL, flashing): those are on the device, not this server — see the official
-[BYOS overview](https://docs.trmnl.com/go/diy/byos) and
+URL, flashing): those are on the device, not this server — see
+[enable Wi-Fi pairing mode](https://help.trmnl.com/en/articles/11511577-enable-wifi-pairing-mode),
+[connect to a BYOS server](https://help.trmnl.com/en/articles/12263392-connect-your-device-to-terminus-byos),
+the [BYOS overview](https://docs.trmnl.com/go/diy/byos), and the
 [firmware repo](https://github.com/usetrmnl/firmware).
