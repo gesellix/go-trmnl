@@ -9,7 +9,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"net/http"
+
 	"github.com/gesellix/go-trmnl/internal/config"
+	"github.com/gesellix/go-trmnl/internal/deviceapi"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
 )
@@ -39,6 +42,12 @@ func run() error {
 	defer st.Close()
 
 	r := server.New()
+
+	// Firmware-facing device API.
+	deviceapi.New(st, cfg.PublicBaseURL, cfg.UploadsDir).Routes(r)
+
+	// Rendered images, fetched by the device on the LAN.
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadsDir))))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
