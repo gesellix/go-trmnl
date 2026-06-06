@@ -20,6 +20,7 @@ import (
 	// Register built-in screen plugins.
 	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
 	_ "github.com/gesellix/go-trmnl/internal/plugins/staticimage"
+	_ "github.com/gesellix/go-trmnl/internal/plugins/weather"
 )
 
 func main() {
@@ -45,6 +46,10 @@ func run() error {
 		return err
 	}
 	defer st.Close()
+
+	if err := seedExample(st); err != nil {
+		log.Printf("WARNING: seed example content: %v", err)
+	}
 
 	r := server.New()
 
