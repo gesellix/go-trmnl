@@ -6,6 +6,7 @@ import (
 	"flag"
 	"image"
 	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
@@ -108,6 +109,39 @@ func TestProcessCachesByContentHash(t *testing.T) {
 	res3, _ := r.Process(img, Threshold)
 	if res3.Hash == res.Hash {
 		t.Errorf("threshold and dithered gradient produced the same hash")
+	}
+}
+
+func TestParseMode(t *testing.T) {
+	if ParseMode("threshold") != Threshold {
+		t.Error(`ParseMode("threshold") should be Threshold`)
+	}
+	for _, s := range []string{"floyd_steinberg", "", "anything"} {
+		if ParseMode(s) != FloydSteinberg {
+			t.Errorf("ParseMode(%q) should default to FloydSteinberg", s)
+		}
+	}
+}
+
+func TestEncodePNG1IsTwoColorPaletted(t *testing.T) {
+	img := gradient(64, 32)
+	var buf bytes.Buffer
+	if err := EncodePNG1(&buf, Monochrome(img, Threshold)); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	decoded, err := png.Decode(&buf)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	pal, ok := decoded.(*image.Paletted)
+	if !ok {
+		t.Fatalf("decoded PNG is %T, want *image.Paletted", decoded)
+	}
+	if len(pal.Palette) != 2 {
+		t.Errorf("palette has %d colors, want 2", len(pal.Palette))
+	}
+	if b := decoded.Bounds(); b.Dx() != 64 || b.Dy() != 32 {
+		t.Errorf("bounds = %v", b)
 	}
 }
 
