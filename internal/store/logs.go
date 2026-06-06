@@ -1,5 +1,7 @@
 package store
 
+import "time"
+
 const logColumns = `id, device_id, log_id, message, created_at, received_at,
 	wifi_status, wifi_signal, sleep_duration, refresh_rate, free_heap_size,
 	max_alloc_size, source_path, source_line, wake_reason, firmware_version,
@@ -34,6 +36,21 @@ func (s *Store) InsertLogs(logs []*DeviceLog) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// PruneLogs deletes device log entries older than the given age and returns the
+// number removed. A non-positive age is a no-op.
+func (s *Store) PruneLogs(olderThan time.Duration) (int64, error) {
+	if olderThan <= 0 {
+		return 0, nil
+	}
+	cutoff := time.Now().Add(-olderThan).Unix()
+	res, err := s.db.Exec(`DELETE FROM device_logs WHERE received_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 // ListLogs returns the most recent log entries for a device, newest first.

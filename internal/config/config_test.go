@@ -33,6 +33,29 @@ func TestLoadDefaults(t *testing.T) {
 	if c.CleanupInterval != time.Hour {
 		t.Errorf("cleanup interval default = %v, want 1h", c.CleanupInterval)
 	}
+	if c.LogRetention != 32*24*time.Hour {
+		t.Errorf("log retention default = %v, want 32d", c.LogRetention)
+	}
+}
+
+func TestLogRetentionParsing(t *testing.T) {
+	cases := map[string]time.Duration{
+		"30d":  30 * 24 * time.Hour,
+		"720h": 720 * time.Hour,
+		"0":    0,
+	}
+	for in, want := range cases {
+		c, err := config.Load([]string{"-base-url", "http://h:8080", "-log-retention", in})
+		if err != nil {
+			t.Fatalf("Load(%q): %v", in, err)
+		}
+		if c.LogRetention != want {
+			t.Errorf("log-retention %q = %v, want %v", in, c.LogRetention, want)
+		}
+	}
+	if _, err := config.Load([]string{"-base-url", "http://h:8080", "-log-retention", "nope"}); err == nil {
+		t.Error("expected error for invalid log-retention")
+	}
 }
 
 func TestCleanupInterval(t *testing.T) {

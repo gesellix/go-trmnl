@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -35,6 +36,9 @@ type Config struct {
 	// CleanupInterval is how often the rendered-image cache is pruned of
 	// unreferenced files. Zero disables cleanup.
 	CleanupInterval time.Duration
+	// LogRetention is how long device log entries are kept before pruning.
+	// Zero disables log pruning.
+	LogRetention time.Duration
 }
 
 // Load parses configuration from the given args (typically os.Args[1:]),
@@ -50,14 +54,19 @@ func Load(args []string) (*Config, error) {
 	adminUser := fs.String("admin-user", env("TRMNL_ADMIN_USER", "admin"), "Admin UI username")
 	adminPass := fs.String("admin-password", env("TRMNL_ADMIN_PASSWORD", ""), "Admin UI password (empty disables auth)")
 	cleanup := fs.String("cleanup-interval", env("TRMNL_CLEANUP_INTERVAL", "1h"), "How often to prune the rendered-image cache (e.g. 1h); 0 disables")
+	logRetention := fs.String("log-retention", env("TRMNL_LOG_RETENTION", "32d"), "How long to keep device logs (e.g. 32d, 720h); 0 disables")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
 
-	cleanupInterval, perr := time.ParseDuration(*cleanup)
+	cleanupInterval, perr := parseDuration(*cleanup)
 	if perr != nil {
 		return nil, fmt.Errorf("invalid cleanup-interval %q: %w", *cleanup, perr)
+	}
+	logRetentionDur, perr := parseDuration(*logRetention)
+	if perr != nil {
+		return nil, fmt.Errorf("invalid log-retention %q: %w", *logRetention, perr)
 	}
 
 	c := &Config{
@@ -69,6 +78,7 @@ func Load(args []string) (*Config, error) {
 		AdminUser:       *adminUser,
 		AdminPassword:   *adminPass,
 		CleanupInterval: cleanupInterval,
+		LogRetention:    logRetentionDur,
 	}
 
 	if c.PublicBaseURL == "" {
@@ -141,6 +151,20 @@ func outboundIP() string {
 		return addr.IP.String()
 	}
 	return ""
+}
+
+// parseDuration parses a Go duration, additionally accepting a plain
+// integer-days form like "32d" (which time.ParseDuration does not support).
+func parseDuration(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if days, ok := strings.CutSuffix(s, "d"); ok {
+		n, err := strconv.Atoi(days)
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("invalid days duration %q", s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	return time.ParseDuration(s)
 }
 
 func env(key, def string) string {

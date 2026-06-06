@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gesellix/go-trmnl/internal/store"
 )
@@ -286,6 +287,40 @@ func TestDeleteDeviceCascadesLogs(t *testing.T) {
 	}
 	if logs, _ := st.ListLogs(d.ID, 10); len(logs) != 0 {
 		t.Errorf("logs not cascaded on device delete: %d", len(logs))
+	}
+}
+
+func TestPruneLogs(t *testing.T) {
+	st := openTest(t)
+	d := newDevice(t, st, "AA:BB:CC:DD:EE:08")
+
+	// Insert two rows with controlled received_at: one old, one fresh.
+	oldTS := time.Now().Add(-40 * 24 * time.Hour).Unix()
+	freshTS := time.Now().Unix()
+	for _, ts := range []int64{oldTS, freshTS} {
+		if _, err := st.DB().Exec(
+			`INSERT INTO device_logs (device_id, message, received_at) VALUES (?, ?, ?)`,
+			d.ID, "m", ts); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Retain 32 days: the 40-day-old row should go, the fresh one stays.
+	n, err := st.PruneLogs(32 * 24 * time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("pruned %d rows, want 1", n)
+	}
+	remaining, _ := st.ListLogs(d.ID, 10)
+	if len(remaining) != 1 {
+		t.Errorf("remaining logs = %d, want 1", len(remaining))
+	}
+
+	// Zero/negative retention is a no-op.
+	if n, _ := st.PruneLogs(0); n != 0 {
+		t.Errorf("PruneLogs(0) removed %d, want 0", n)
 	}
 }
 

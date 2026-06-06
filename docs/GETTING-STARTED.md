@@ -250,6 +250,7 @@ All settings are flags or environment variables (flags win):
 | `-admin-user`     | `TRMNL_ADMIN_USER`     | `admin`               | Admin UI username                      |
 | `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)               | Admin UI password; empty disables auth |
 | `-cleanup-interval` | `TRMNL_CLEANUP_INTERVAL` | `1h`             | How often to prune the image cache; `0` disables |
+| `-log-retention`  | `TRMNL_LOG_RETENTION`  | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
 
@@ -264,6 +265,12 @@ Uploaded static-image assets (under `uploads/assets/`) and the placeholder are
 never pruned. Removal is safe — if a still-needed image is pruned, the next poll
 re-renders it (the file name is deterministic from its content). Set
 `-cleanup-interval 0` to disable pruning.
+
+### Device logs
+
+Devices post log entries to `/api/log`; these accumulate in the database. The
+same maintenance loop prunes entries older than `-log-retention` (default 32
+days). Set `-log-retention 0` to keep logs indefinitely.
 
 ---
 

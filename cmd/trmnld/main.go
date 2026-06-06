@@ -80,42 +80,61 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if cfg.CleanupInterval > 0 {
-		go runCleanup(ctx, st, cfg.UploadsDir, cfg.CleanupInterval)
+	if cfg.CleanupInterval > 0 || cfg.LogRetention > 0 {
+		go runMaintenance(ctx, st, cfg.UploadsDir, cfg.CleanupInterval, cfg.LogRetention)
 	}
 
 	log.Printf("trmnld %s listening on %s (public base URL %s)", version, cfg.ListenAddr, cfg.PublicBaseURL)
 	return server.Run(ctx, cfg.ListenAddr, r)
 }
 
-// runCleanup periodically prunes the rendered-image cache of files not
-// referenced by any screen. Files newer than one interval are kept as a grace
-// window. Runs until ctx is cancelled.
-func runCleanup(ctx context.Context, st *store.Store, uploadsDir string, interval time.Duration) {
-	ticker := time.NewTicker(interval)
+// runMaintenance periodically prunes the rendered-image cache (files not
+// referenced by any screen, older than one tick as a grace window) and old
+// device logs. It runs until ctx is cancelled. The tick is cleanupInterval when
+// set, otherwise a default used solely to pace log pruning.
+func runMaintenance(ctx context.Context, st *store.Store, uploadsDir string, cleanupInterval, logRetention time.Duration) {
+	tick := cleanupInterval
+	if tick <= 0 {
+		tick = time.Hour
+	}
+	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			hashes, err := st.ActiveRenderHashes()
-			if err != nil {
-				log.Printf("cleanup: list render hashes: %v", err)
-				continue
+			if cleanupInterval > 0 {
+				sweepCache(st, uploadsDir, cleanupInterval)
 			}
-			keep := make(map[string]bool, len(hashes))
-			for _, h := range hashes {
-				keep[h] = true
-			}
-			removed, err := uploads.Sweep(uploadsDir, keep, interval)
-			if err != nil {
-				log.Printf("cleanup: sweep %s: %v", uploadsDir, err)
-				continue
-			}
-			if removed > 0 {
-				log.Printf("cleanup: removed %d stale cache file(s)", removed)
+			if logRetention > 0 {
+				if n, err := st.PruneLogs(logRetention); err != nil {
+					log.Printf("maintenance: prune logs: %v", err)
+				} else if n > 0 {
+					log.Printf("maintenance: pruned %d old log entry(ies)", n)
+				}
 			}
 		}
+	}
+}
+
+// sweepCache removes rendered-image files not referenced by any screen.
+func sweepCache(st *store.Store, uploadsDir string, grace time.Duration) {
+	hashes, err := st.ActiveRenderHashes()
+	if err != nil {
+		log.Printf("maintenance: list render hashes: %v", err)
+		return
+	}
+	keep := make(map[string]bool, len(hashes))
+	for _, h := range hashes {
+		keep[h] = true
+	}
+	removed, err := uploads.Sweep(uploadsDir, keep, grace)
+	if err != nil {
+		log.Printf("maintenance: sweep %s: %v", uploadsDir, err)
+		return
+	}
+	if removed > 0 {
+		log.Printf("maintenance: removed %d stale cache file(s)", removed)
 	}
 }
