@@ -1,0 +1,12 @@
+# Build output
+/trmnld
+/dist/
+
+# Runtime data (database, rendered uploads)
+/data/
+
+# IDE
+/.idea/
+
+# OS
+.DS_Store
