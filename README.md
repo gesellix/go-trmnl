@@ -59,15 +59,15 @@ go run ./cmd/trmnld -base-url http://<your-lan-ip>:8080
 
 Configuration (flags or environment variables; flags win):
 
-| Flag         | Env                | Default               | Purpose                              |
-|--------------|--------------------|-----------------------|--------------------------------------|
-| `-listen`    | `TRMNL_LISTEN`     | `:8080`               | HTTP listen address                  |
-| `-base-url`  | `TRMNL_BASE_URL`   | auto (LAN IP)         | Public URL the device uses           |
-| `-data-dir`  | `TRMNL_DATA_DIR`   | `./data`              | Root for the database and uploads    |
-| `-db`        | `TRMNL_DB`         | `<data-dir>/trmnl.db` | SQLite database path                 |
-| `-uploads`   | `TRMNL_UPLOADS`    | `<data-dir>/uploads`  | Rendered image directory             |
-| `-admin-user`     | `TRMNL_ADMIN_USER`     | `admin` | Admin UI username                       |
-| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty) | Admin UI password; empty disables auth  |
+| Flag              | Env                    | Default               | Purpose                                |
+|-------------------|------------------------|-----------------------|----------------------------------------|
+| `-listen`         | `TRMNL_LISTEN`         | `:8080`               | HTTP listen address                    |
+| `-base-url`       | `TRMNL_BASE_URL`       | auto (LAN IP)         | Public URL the device uses             |
+| `-data-dir`       | `TRMNL_DATA_DIR`       | `./data`              | Root for the database and uploads      |
+| `-db`             | `TRMNL_DB`             | `<data-dir>/trmnl.db` | SQLite database path                   |
+| `-uploads`        | `TRMNL_UPLOADS`        | `<data-dir>/uploads`  | Rendered image directory               |
+| `-admin-user`     | `TRMNL_ADMIN_USER`     | `admin`               | Admin UI username                      |
+| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)               | Admin UI password; empty disables auth |
 
 The `/admin` UI is protected with HTTP Basic Auth when `-admin-password` (or
 `TRMNL_ADMIN_PASSWORD`) is set. The device endpoints (`/api/*`) and `/uploads`
