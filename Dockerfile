@@ -8,8 +8,11 @@ RUN go mod download
 COPY . .
 ARG TARGETOS
 ARG TARGETARCH
+ARG TARGETVARIANT
+ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -trimpath -ldflags="-s -w" -o /out/trmnld ./cmd/trmnld
+    GOARM=$(echo "${TARGETVARIANT}" | tr -d 'v') \
+    go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/trmnld ./cmd/trmnld
 
 # Pre-create the data dir so it is owned by the nonroot user in the final image.
 RUN mkdir -p /data

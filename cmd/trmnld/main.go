@@ -26,6 +26,10 @@ import (
 	_ "github.com/gesellix/go-trmnl/internal/plugins/weather"
 )
 
+// version is the build version, overridden at release time via
+// -ldflags "-X main.version=v1.2.3".
+var version = "dev"
+
 func main() {
 	if err := run(); err != nil {
 		log.Fatalf("trmnld: %v", err)
@@ -74,6 +78,6 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Printf("trmnld listening on %s (public base URL %s)", cfg.ListenAddr, cfg.PublicBaseURL)
+	log.Printf("trmnld %s listening on %s (public base URL %s)", version, cfg.ListenAddr, cfg.PublicBaseURL)
 	return server.Run(ctx, cfg.ListenAddr, r)
 }

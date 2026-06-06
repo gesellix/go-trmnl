@@ -89,7 +89,21 @@ are never authenticated, since the device cannot supply credentials.
 Point your TRMNL device's custom server URL at `<base-url>` and it will
 auto-register on its first `/api/setup` call.
 
-## Docker
+## Install
+
+Tagged releases publish a multi-arch Docker image to GHCR and prebuilt binaries
+(linux/macOS/windows/freebsd, incl. arm/arm64) with checksums on the
+[releases page](https://github.com/gesellix/go-trmnl/releases).
+
+```sh
+# Released image (once a vX.Y.Z tag exists)
+docker run -p 8080:8080 -v trmnl-data:/data \
+  -e TRMNL_BASE_URL=http://<your-lan-ip>:8080 \
+  -e TRMNL_ADMIN_PASSWORD=changeme \
+  ghcr.io/gesellix/go-trmnl:latest
+```
+
+## Docker (from source)
 
 ```sh
 docker build -t go-trmnl .
@@ -112,4 +126,13 @@ make vuln       # govulncheck
 ```
 
 CI runs tests (with `-race`), `golangci-lint`, a cross-platform build matrix,
-`govulncheck`, a Docker build, and CodeQL analysis. See `.github/workflows/`.
+`govulncheck`, a Docker build, and CodeQL analysis. A scheduled Security
+workflow runs `govulncheck`, `staticcheck` and Semgrep. Pushing a `vX.Y.Z` tag
+triggers the Release workflow, which builds binaries + checksums, publishes a
+GitHub release, and pushes a multi-arch image to GHCR. See `.github/workflows/`.
+
+To cut a release:
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
