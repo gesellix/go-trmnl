@@ -64,6 +64,12 @@ Configuration (flags or environment variables; flags win):
 | `-data-dir`  | `TRMNL_DATA_DIR`   | `./data`              | Root for the database and uploads    |
 | `-db`        | `TRMNL_DB`         | `<data-dir>/trmnl.db` | SQLite database path                 |
 | `-uploads`   | `TRMNL_UPLOADS`    | `<data-dir>/uploads`  | Rendered image directory             |
+| `-admin-user`     | `TRMNL_ADMIN_USER`     | `admin` | Admin UI username                       |
+| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty) | Admin UI password; empty disables auth  |
+
+The `/admin` UI is protected with HTTP Basic Auth when `-admin-password` (or
+`TRMNL_ADMIN_PASSWORD`) is set. The device endpoints (`/api/*`) and `/uploads`
+are never authenticated, since the device cannot supply credentials.
 
 Point your TRMNL device's custom server URL at `<base-url>` and it will
 auto-register on its first `/api/setup` call.

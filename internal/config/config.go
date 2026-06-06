@@ -27,6 +27,10 @@ type Config struct {
 	DBPath string
 	// UploadsDir is where rendered images are cached and served from.
 	UploadsDir string
+	// AdminUser and AdminPassword guard the /admin UI with HTTP Basic Auth.
+	// Auth is disabled when AdminPassword is empty.
+	AdminUser     string
+	AdminPassword string
 }
 
 // Load parses configuration from the given args (typically os.Args[1:]),
@@ -39,6 +43,8 @@ func Load(args []string) (*Config, error) {
 	dataDir := fs.String("data-dir", env("TRMNL_DATA_DIR", "./data"), "Data directory for database and uploads")
 	dbPath := fs.String("db", env("TRMNL_DB", ""), "SQLite database path (default <data-dir>/trmnl.db)")
 	uploads := fs.String("uploads", env("TRMNL_UPLOADS", ""), "Uploads directory (default <data-dir>/uploads)")
+	adminUser := fs.String("admin-user", env("TRMNL_ADMIN_USER", "admin"), "Admin UI username")
+	adminPass := fs.String("admin-password", env("TRMNL_ADMIN_PASSWORD", ""), "Admin UI password (empty disables auth)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -50,6 +56,8 @@ func Load(args []string) (*Config, error) {
 		DataDir:       *dataDir,
 		DBPath:        *dbPath,
 		UploadsDir:    *uploads,
+		AdminUser:     *adminUser,
+		AdminPassword: *adminPass,
 	}
 
 	if c.PublicBaseURL == "" {

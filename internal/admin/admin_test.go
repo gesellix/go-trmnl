@@ -25,7 +25,7 @@ func newAdminServer(t *testing.T) (*httptest.Server, *store.Store) {
 	}
 	t.Cleanup(func() { st.Close() })
 	r := server.New()
-	admin.New(st, "http://test.local", dir).Routes(r)
+	admin.New(st, "http://test.local", dir, admin.Auth{}).Routes(r)
 	ts := httptest.NewServer(r)
 	t.Cleanup(ts.Close)
 	// Don't follow redirects, so we can assert on 302 Location.
@@ -88,3 +88,45 @@ func TestAdminCreateScreenAndPlaylist(t *testing.T) {
 }
 
 func itoa(v int64) string { return strconv.FormatInt(v, 10) }
+
+func TestAdminAuth(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(filepath.Join(dir, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	r := server.New()
+	admin.New(st, "http://test.local", dir, admin.Auth{User: "admin", Password: "s3cret"}).Routes(r)
+	ts := httptest.NewServer(r)
+	t.Cleanup(ts.Close)
+	ts.Client().CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+	// No credentials -> 401 with a challenge.
+	resp, _ := ts.Client().Get(ts.URL + "/admin")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no-auth status = %d, want 401", resp.StatusCode)
+	}
+	if resp.Header.Get("WWW-Authenticate") == "" {
+		t.Errorf("missing WWW-Authenticate challenge")
+	}
+
+	// Wrong password -> 401.
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/admin", nil)
+	req.SetBasicAuth("admin", "wrong")
+	resp2, _ := ts.Client().Do(req)
+	resp2.Body.Close()
+	if resp2.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong-pass status = %d, want 401", resp2.StatusCode)
+	}
+
+	// Correct credentials -> 200.
+	req3, _ := http.NewRequest(http.MethodGet, ts.URL+"/admin", nil)
+	req3.SetBasicAuth("admin", "s3cret")
+	resp3, _ := ts.Client().Do(req3)
+	resp3.Body.Close()
+	if resp3.StatusCode != http.StatusOK {
+		t.Fatalf("good-auth status = %d, want 200", resp3.StatusCode)
+	}
+}

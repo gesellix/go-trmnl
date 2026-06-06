@@ -60,7 +60,13 @@ func run() error {
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadsDir))))
 
 	// Admin web UI (and "/" redirect to it).
-	admin.New(st, cfg.PublicBaseURL, cfg.UploadsDir).Routes(r)
+	if cfg.AdminPassword == "" {
+		log.Printf("WARNING: admin UI authentication is disabled (set -admin-password or TRMNL_ADMIN_PASSWORD)")
+	}
+	admin.New(st, cfg.PublicBaseURL, cfg.UploadsDir, admin.Auth{
+		User:     cfg.AdminUser,
+		Password: cfg.AdminPassword,
+	}).Routes(r)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

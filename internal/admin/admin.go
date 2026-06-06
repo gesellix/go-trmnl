@@ -5,6 +5,7 @@ package admin
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"database/sql"
 	"net/http"
 	"path/filepath"
@@ -16,6 +17,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Auth holds optional HTTP Basic Auth credentials for the admin UI. When
+// Password is empty, authentication is disabled.
+type Auth struct {
+	User     string
+	Password string
+}
+
 // Handler holds the admin UI dependencies.
 type Handler struct {
 	store      *store.Store
@@ -24,10 +32,11 @@ type Handler struct {
 	assetsDir  string
 	renderer   *render.Renderer
 	tmpl       *templateSet
+	auth       Auth
 }
 
-// New creates the admin handler.
-func New(st *store.Store, baseURL, uploadsDir string) *Handler {
+// New creates the admin handler. auth guards the UI when its Password is set.
+func New(st *store.Store, baseURL, uploadsDir string, auth Auth) *Handler {
 	return &Handler{
 		store:      st,
 		baseURL:    baseURL,
@@ -35,7 +44,27 @@ func New(st *store.Store, baseURL, uploadsDir string) *Handler {
 		assetsDir:  filepath.Join(uploadsDir, "assets"),
 		renderer:   render.NewRenderer(uploadsDir),
 		tmpl:       mustParseTemplates(),
+		auth:       auth,
 	}
+}
+
+// requireAuth enforces HTTP Basic Auth when a password is configured.
+func (h *Handler) requireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.auth.Password == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		user, pass, ok := r.BasicAuth()
+		userOK := subtle.ConstantTimeCompare([]byte(user), []byte(h.auth.User)) == 1
+		passOK := subtle.ConstantTimeCompare([]byte(pass), []byte(h.auth.Password)) == 1
+		if !ok || !userOK || !passOK {
+			w.Header().Set("WWW-Authenticate", `Basic realm="go-trmnl admin", charset="UTF-8"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Routes mounts the admin UI and its static assets onto r.
@@ -43,9 +72,10 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/admin", http.StatusFound)
 	})
-	r.Handle("/admin/static/*", http.StripPrefix("/admin/static/", staticFileServer()))
+	r.With(h.requireAuth).Handle("/admin/static/*", http.StripPrefix("/admin/static/", staticFileServer()))
 
 	r.Route("/admin", func(r chi.Router) {
+		r.Use(h.requireAuth)
 		r.Get("/", h.Dashboard)
 
 		r.Get("/devices", h.DevicesList)
