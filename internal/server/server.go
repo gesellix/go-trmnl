@@ -34,6 +34,11 @@ func Run(ctx context.Context, addr string, handler http.Handler) error {
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
+		// WriteTimeout bounds slow/stuck responses (image downloads are small
+		// LAN transfers); IdleTimeout reaps idle keep-alive connections so they
+		// don't accumulate over a long-running process.
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	errCh := make(chan error, 1)
