@@ -1,0 +1,32 @@
+{{define "content"}}
+{{$pl := .Playlist}}
+<p><a href="/admin/playlists">&larr; Playlists</a></p>
+<h1>{{$pl.Name}}</h1>
+
+<h2>Screens in this playlist</h2>
+{{if .Items}}
+<ol class="list">
+  {{range .Items}}
+    <li>
+      <a href="/admin/screens/{{.ScreenID}}">{{.ScreenName}}</a>
+      <form method="post" action="/admin/playlists/{{$pl.ID}}/items/{{.ItemID}}/delete" class="inline">
+        <button type="submit" class="link danger">remove</button>
+      </form>
+    </li>
+  {{end}}
+</ol>
+{{else}}
+<p class="muted">Empty. Add a screen below.</p>
+{{end}}
+
+<form method="post" action="/admin/playlists/{{$pl.ID}}/items" class="inline">
+  <select name="screen_id">
+    {{range .AllScreens}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+  </select>
+  <button type="submit">Add screen</button>
+</form>
+
+<form method="post" action="/admin/playlists/{{$pl.ID}}/delete" onsubmit="return confirm('Delete this playlist?')">
+  <button type="submit" class="danger">Delete playlist</button>
+</form>
+{{end}}

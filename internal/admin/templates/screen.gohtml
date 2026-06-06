@@ -1,0 +1,41 @@
+{{define "content"}}
+{{$s := .Screen}}
+<p><a href="/admin/screens">&larr; Screens</a></p>
+<h1>{{$s.Name}} <span class="muted">({{.PluginType}})</span></h1>
+
+<div class="split">
+  <div>
+    <h2>Settings</h2>
+    <form method="post" action="/admin/screens/{{$s.ID}}">
+      <label>Name <input type="text" name="name" value="{{$s.Name}}"></label>
+      <label>Settings (JSON)
+        <textarea name="settings_json" rows="10">{{$s.SettingsJSON}}</textarea>
+      </label>
+      <button type="submit">Save</button>
+    </form>
+
+    {{if .IsImage}}
+    <h2>Upload image</h2>
+    <form method="post" action="/admin/screens/{{$s.ID}}/upload" enctype="multipart/form-data">
+      <input type="file" name="image" accept="image/*">
+      <button type="submit">Upload</button>
+    </form>
+    {{end}}
+  </div>
+  <div>
+    <h2>Preview</h2>
+    {{if $s.RenderedHash.Valid}}
+      <img class="preview" src="{{.BaseURL}}/uploads/{{ns $s.RenderedHash}}.png" alt="preview">
+    {{else}}
+      <p class="muted">Not rendered yet.</p>
+    {{end}}
+    <form method="post" action="/admin/screens/{{$s.ID}}/preview">
+      <button type="submit">Render preview</button>
+    </form>
+  </div>
+</div>
+
+<form method="post" action="/admin/screens/{{$s.ID}}/delete" onsubmit="return confirm('Delete this screen?')">
+  <button type="submit" class="danger">Delete screen</button>
+</form>
+{{end}}

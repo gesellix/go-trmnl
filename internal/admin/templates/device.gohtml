@@ -1,0 +1,56 @@
+{{define "content"}}
+{{$d := .Device}}
+<p><a href="/admin/devices">&larr; Devices</a></p>
+<h1>{{def $d.FriendlyID (ns $d.Name)}}</h1>
+
+<div class="split">
+  <div>
+    <h2>Telemetry</h2>
+    <table class="kv">
+      <tr><th>Friendly ID</th><td>{{$d.FriendlyID}}</td></tr>
+      <tr><th>MAC</th><td><code>{{$d.MAC}}</code></td></tr>
+      <tr><th>API key</th><td><code>{{$d.APIKey}}</code></td></tr>
+      <tr><th>Model</th><td>{{def "&mdash;" (ns $d.Model)}}</td></tr>
+      <tr><th>Firmware</th><td>{{def "&mdash;" (ns $d.FWVersion)}}</td></tr>
+      <tr><th>Resolution</th><td>{{$d.Width}}&times;{{$d.Height}}</td></tr>
+      <tr><th>Battery</th><td>{{with nf $d.BatteryVoltage 2}}{{.}}V{{else}}&mdash;{{end}}</td></tr>
+      <tr><th>RSSI</th><td>{{def "&mdash;" (ni $d.RSSI)}}</td></tr>
+      <tr><th>Last seen</th><td>{{since $d.LastSeenAt}}</td></tr>
+    </table>
+  </div>
+  <div>
+    <h2>Current screen</h2>
+    {{if .PreviewHash}}
+      <img class="preview" src="{{.BaseURL}}/uploads/{{.PreviewHash}}.png" alt="current screen">
+    {{else}}
+      <p class="muted">Nothing rendered yet.</p>
+    {{end}}
+    <form method="post" action="/admin/devices/{{$d.ID}}/refresh">
+      <button type="submit">Force refresh</button>
+    </form>
+  </div>
+</div>
+
+<h2>Settings</h2>
+<form method="post" action="/admin/devices/{{$d.ID}}">
+  <label>Name <input type="text" name="name" value="{{ns $d.Name}}"></label>
+  <label>Refresh rate (s) <input type="number" name="refresh_rate" min="60" value="{{$d.RefreshRate}}"></label>
+  <label>Playlist
+    <select name="playlist_id">
+      <option value="0">(none)</option>
+      {{range .Playlists}}
+        <option value="{{.ID}}" {{if and $d.PlaylistID.Valid (eq $d.PlaylistID.Int64 .ID)}}selected{{end}}>{{.Name}}</option>
+      {{end}}
+    </select>
+  </label>
+  <button type="submit">Save</button>
+</form>
+
+<p>
+  <a href="/admin/devices/{{$d.ID}}/logs">View logs</a>
+</p>
+
+<form method="post" action="/admin/devices/{{$d.ID}}/delete" onsubmit="return confirm('Delete this device?')">
+  <button type="submit" class="danger">Delete device</button>
+</form>
+{{end}}

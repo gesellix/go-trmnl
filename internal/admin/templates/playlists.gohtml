@@ -1,0 +1,16 @@
+{{define "content"}}
+<h1>Playlists</h1>
+
+<form method="post" action="/admin/playlists" class="inline">
+  <input type="text" name="name" placeholder="Playlist name">
+  <button type="submit">Create playlist</button>
+</form>
+
+{{if .Playlists}}
+<ul class="list">
+  {{range .Playlists}}<li><a href="/admin/playlists/{{.ID}}">{{.Name}}</a></li>{{end}}
+</ul>
+{{else}}
+<p class="muted">No playlists yet.</p>
+{{end}}
+{{end}}

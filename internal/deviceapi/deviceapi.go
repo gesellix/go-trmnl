@@ -6,8 +6,6 @@ package deviceapi
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -16,6 +14,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/playlist"
 	"github.com/gesellix/go-trmnl/internal/plugins"
 	"github.com/gesellix/go-trmnl/internal/render"
+	"github.com/gesellix/go-trmnl/internal/screens"
 	"github.com/gesellix/go-trmnl/internal/store"
 	"github.com/go-chi/chi/v5"
 )
@@ -79,37 +78,18 @@ func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *sto
 	if err != nil {
 		return "", err
 	}
-	p, ok := plugins.Get(pluginRow.Type)
-	if !ok {
-		return "", errors.New("unknown plugin type " + pluginRow.Type)
+	ttl := time.Duration(0)
+	if p, ok := plugins.Get(pluginRow.Type); ok {
+		ttl = p.DefaultRefresh()
 	}
-
-	if hash, ok := h.cachedHash(screen, p.DefaultRefresh()); ok {
+	if hash, ok := h.cachedHash(screen, ttl); ok {
 		return hash, nil
 	}
 
-	in := plugins.RenderInput{
-		Device:    d,
-		Screen:    screen,
-		Settings:  json.RawMessage(screen.SettingsJSON),
-		Now:       time.Now(),
-		Width:     render.Width,
-		Height:    render.Height,
-		AssetsDir: h.assetsDir,
-	}
-	model, err := p.DataModel(ctx, in)
+	res, err := screens.Render(ctx, h.store, h.renderer, h.assetsDir, d, screen, h.ditherMode())
 	if err != nil {
 		return "", err
 	}
-	img, err := p.Render(ctx, in, model)
-	if err != nil {
-		return "", err
-	}
-	res, err := h.renderer.Process(img, h.ditherMode())
-	if err != nil {
-		return "", err
-	}
-	_ = h.store.SetScreenRendered(screen.ID, res.Hash)
 	return res.Hash, nil
 }
 

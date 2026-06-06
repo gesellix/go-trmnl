@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>Screens</h1>
+
+<form method="post" action="/admin/screens" class="inline">
+  <select name="plugin_type">
+    {{range .Plugins}}<option value="{{.Type}}">{{.Title}}</option>{{end}}
+  </select>
+  <input type="text" name="name" placeholder="Screen name">
+  <button type="submit">Create screen</button>
+</form>
+
+{{if .Screens}}
+<table>
+  <thead><tr><th>Name</th><th>Plugin</th><th>Preview</th></tr></thead>
+  <tbody>
+  {{range .Screens}}
+    <tr>
+      <td><a href="/admin/screens/{{.ID}}">{{.Name}}</a></td>
+      <td>{{.PluginType}}</td>
+      <td>{{if .Rendered}}<img class="thumb" src="{{$.BaseURL}}/uploads/{{.Rendered}}.png" alt="">{{else}}<span class="muted">not rendered</span>{{end}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No screens yet. Create one above.</p>
+{{end}}
+{{end}}

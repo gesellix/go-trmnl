@@ -1,0 +1,18 @@
+{{define "content"}}
+<h1>Settings</h1>
+<form method="post" action="/admin/settings">
+  <label>Dithering mode
+    <select name="dither_mode">
+      <option value="floyd_steinberg" {{if eq .DitherMode "floyd_steinberg"}}selected{{end}}>Floyd-Steinberg (best for photos)</option>
+      <option value="threshold" {{if eq .DitherMode "threshold"}}selected{{end}}>Threshold (sharp, for text/UI)</option>
+    </select>
+  </label>
+  <button type="submit">Save</button>
+</form>
+
+<h2>Server</h2>
+<table class="kv">
+  <tr><th>Public base URL</th><td><code>{{.BaseURL}}</code></td></tr>
+</table>
+<p class="muted">The base URL is set at startup with <code>-base-url</code>; the device must be able to reach it on your network.</p>
+{{end}}

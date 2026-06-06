@@ -1,0 +1,31 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+
+<div class="cards">
+  <a class="card" href="/admin/devices"><span class="num">{{.DeviceCount}}</span> Devices</a>
+  <a class="card" href="/admin/screens"><span class="num">{{.ScreenCount}}</span> Screens</a>
+  <a class="card" href="/admin/playlists"><span class="num">{{.PlaylistCount}}</span> Playlists</a>
+</div>
+
+<p class="muted">Public base URL: <code>{{.BaseURL}}</code> &mdash; point your device's custom server here.</p>
+
+<h2>Recently seen devices</h2>
+{{if .Devices}}
+<table>
+  <thead><tr><th>Friendly ID</th><th>Name</th><th>MAC</th><th>Battery</th><th>Last seen</th></tr></thead>
+  <tbody>
+  {{range .Devices}}
+    <tr>
+      <td><a href="/admin/devices/{{.ID}}">{{.FriendlyID}}</a></td>
+      <td>{{def "&mdash;" (ns .Name)}}</td>
+      <td><code>{{.MAC}}</code></td>
+      <td>{{with nf .BatteryVoltage 2}}{{.}}V{{else}}&mdash;{{end}}</td>
+      <td>{{since .LastSeenAt}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No devices yet. Power on a TRMNL pointed at this server and it will auto-register.</p>
+{{end}}
+{{end}}

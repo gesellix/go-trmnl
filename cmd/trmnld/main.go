@@ -11,6 +11,7 @@ import (
 
 	"net/http"
 
+	"github.com/gesellix/go-trmnl/internal/admin"
 	"github.com/gesellix/go-trmnl/internal/config"
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
 	"github.com/gesellix/go-trmnl/internal/server"
@@ -52,6 +53,9 @@ func run() error {
 
 	// Rendered images, fetched by the device on the LAN.
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadsDir))))
+
+	// Admin web UI (and "/" redirect to it).
+	admin.New(st, cfg.PublicBaseURL, cfg.UploadsDir).Routes(r)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

@@ -1,0 +1,25 @@
+{{define "content"}}
+{{$d := .Device}}
+<p><a href="/admin/devices/{{$d.ID}}">&larr; {{def $d.FriendlyID (ns $d.Name)}}</a></p>
+<h1>Logs</h1>
+{{if .Logs}}
+<table class="logs">
+  <thead><tr><th>Received</th><th>Wake</th><th>FW</th><th>WiFi</th><th>Battery</th><th>Source</th><th>Message</th></tr></thead>
+  <tbody>
+  {{range .Logs}}
+    <tr>
+      <td>{{ago .ReceivedAt}}</td>
+      <td>{{ns .WakeReason}}</td>
+      <td>{{ns .FirmwareVersion}}</td>
+      <td>{{ns .WifiStatus}} {{ni .WifiSignal}}</td>
+      <td>{{nf .BatteryVoltage 2}}</td>
+      <td>{{ns .SourcePath}}{{if .SourceLine.Valid}}:{{ni .SourceLine}}{{end}}</td>
+      <td>{{ns .Message}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No log entries reported yet.</p>
+{{end}}
+{{end}}

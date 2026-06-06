@@ -11,14 +11,23 @@ seconds. The server never pushes to the device.
 
 ## Status
 
-Work in progress. See [`docs/PLAN.md`](docs/PLAN.md) for the full design and the
-milestone breakdown.
+See [`docs/PLAN.md`](docs/PLAN.md) for the full design and milestone breakdown.
 
 - [x] **M0** Skeleton: config, SQLite store + migrations, HTTP server
-- [ ] **M1** Device API: `/api/setup`, `/api/display`, `/api/log`, `/uploads`
-- [ ] **M2** Render pipeline: 1-bit BMP3 + PNG with Floyd-Steinberg dithering
-- [ ] **M3** Plugins + playlists
-- [ ] **M4** Admin web UI
+- [x] **M1** Device API: `/api/setup`, `/api/display`, `/api/log`, `/uploads`
+- [x] **M2** Render pipeline: 1-bit BMP3 + PNG with Floyd-Steinberg dithering
+- [x] **M3** Plugins + playlists (built-in clock and static-image plugins)
+- [x] **M4** Admin web UI: devices, screens, playlists, logs, settings
+
+The core BYOS platform is functional end-to-end: a device auto-registers, an
+operator builds screens and playlists in the admin UI, and the device renders
+them. Remaining polish (M5): admin auth, OTA firmware fields, more plugins.
+
+## Admin UI
+
+Browse to `<base-url>/admin` to manage devices, build screens from plugins,
+arrange them into playlists, assign a playlist to a device, view device logs,
+and preview rendered screens.
 
 ## Design goals
 

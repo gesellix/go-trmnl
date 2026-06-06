@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>Devices</h1>
+{{if .Devices}}
+<table>
+  <thead><tr><th>Friendly ID</th><th>Name</th><th>MAC</th><th>FW</th><th>Battery</th><th>RSSI</th><th>Last seen</th></tr></thead>
+  <tbody>
+  {{range .Devices}}
+    <tr>
+      <td><a href="/admin/devices/{{.ID}}">{{.FriendlyID}}</a></td>
+      <td>{{def "&mdash;" (ns .Name)}}</td>
+      <td><code>{{.MAC}}</code></td>
+      <td>{{def "&mdash;" (ns .FWVersion)}}</td>
+      <td>{{with nf .BatteryVoltage 2}}{{.}}V{{else}}&mdash;{{end}}</td>
+      <td>{{def "&mdash;" (ni .RSSI)}}</td>
+      <td>{{since .LastSeenAt}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No devices registered yet.</p>
+{{end}}
+{{end}}
