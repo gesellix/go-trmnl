@@ -11,6 +11,19 @@ The TRMNL firmware is **pull-based**: the device wakes from deep sleep, calls th
 server, renders the returned 800x480 1-bit image, then sleeps for `refresh_rate`
 seconds. The server never pushes to the device.
 
+## Documentation
+
+- **[Getting started](docs/GETTING-STARTED.md)** — run the server, point a
+  device at it, and build your first screen and playlist. Start here.
+- **[Device API reference](docs/API.md)** — the firmware-facing endpoints,
+  headers and responses.
+- **[Plugins reference](docs/PLUGINS.md)** — built-in screens and their settings.
+- **[Design & milestones](docs/PLAN.md)** — how the server is built.
+
+Official TRMNL references: [BYOS overview](https://docs.trmnl.com/go/diy/byos),
+[DIY introduction](https://docs.trmnl.com/go/diy/introduction),
+[firmware](https://github.com/usetrmnl/firmware).
+
 ## Status
 
 See [`docs/PLAN.md`](docs/PLAN.md) for the full design and milestone breakdown.
