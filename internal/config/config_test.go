@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gesellix/go-trmnl/internal/config"
 )
@@ -28,6 +29,22 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if c.AdminUser != "admin" || c.AdminPassword != "" {
 		t.Errorf("admin defaults wrong: %q/%q", c.AdminUser, c.AdminPassword)
+	}
+	if c.CleanupInterval != time.Hour {
+		t.Errorf("cleanup interval default = %v, want 1h", c.CleanupInterval)
+	}
+}
+
+func TestCleanupInterval(t *testing.T) {
+	c, err := config.Load([]string{"-base-url", "http://h:8080", "-cleanup-interval", "0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.CleanupInterval != 0 {
+		t.Errorf("cleanup interval = %v, want 0 (disabled)", c.CleanupInterval)
+	}
+	if _, err := config.Load([]string{"-base-url", "http://h:8080", "-cleanup-interval", "nope"}); err == nil {
+		t.Error("expected error for invalid cleanup-interval")
 	}
 }
 

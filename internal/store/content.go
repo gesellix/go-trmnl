@@ -101,6 +101,26 @@ func (s *Store) SetScreenRendered(id int64, hash string) error {
 	return err
 }
 
+// ActiveRenderHashes returns the distinct, currently-referenced render hashes
+// across all screens, used to decide which cached image files to keep.
+func (s *Store) ActiveRenderHashes() ([]string, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT rendered_hash FROM screens
+		WHERE rendered_hash IS NOT NULL AND rendered_hash <> ''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var h string
+		if err := rows.Scan(&h); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
 // ClearScreenRendered forces a screen to re-render on next request.
 func (s *Store) ClearScreenRendered(id int64) error {
 	_, err := s.db.Exec(`UPDATE screens SET rendered_hash = NULL, rendered_at = NULL WHERE id = ?`, id)

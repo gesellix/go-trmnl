@@ -249,8 +249,21 @@ All settings are flags or environment variables (flags win):
 | `-uploads`        | `TRMNL_UPLOADS`        | `<data-dir>/uploads`  | Rendered image directory               |
 | `-admin-user`     | `TRMNL_ADMIN_USER`     | `admin`               | Admin UI username                      |
 | `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)               | Admin UI password; empty disables auth |
+| `-cleanup-interval` | `TRMNL_CLEANUP_INTERVAL` | `1h`             | How often to prune the image cache; `0` disables |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
+
+### Rendered-image cache
+
+Rendered screens are written to the uploads directory as content-hashed
+`<hash>.bmp` / `<hash>.png` files and served from there. Because some screens
+re-render often (the clock changes every minute), the server periodically prunes
+this cache: every `cleanup-interval` it removes image files that are no longer
+referenced by any screen and are older than one interval (a grace window).
+Uploaded static-image assets (under `uploads/assets/`) and the placeholder are
+never pruned. Removal is safe — if a still-needed image is pruned, the next poll
+re-renders it (the file name is deterministic from its content). Set
+`-cleanup-interval 0` to disable pruning.
 
 ---
 

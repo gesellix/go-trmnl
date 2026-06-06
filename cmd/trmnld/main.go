@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	// Embed the timezone database so timezone-aware screens (e.g. the clock
 	// plugin) work on minimal images that lack system tzdata.
@@ -19,6 +20,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
+	"github.com/gesellix/go-trmnl/internal/uploads"
 
 	// Register built-in screen plugins.
 	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
@@ -78,6 +80,42 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if cfg.CleanupInterval > 0 {
+		go runCleanup(ctx, st, cfg.UploadsDir, cfg.CleanupInterval)
+	}
+
 	log.Printf("trmnld %s listening on %s (public base URL %s)", version, cfg.ListenAddr, cfg.PublicBaseURL)
 	return server.Run(ctx, cfg.ListenAddr, r)
+}
+
+// runCleanup periodically prunes the rendered-image cache of files not
+// referenced by any screen. Files newer than one interval are kept as a grace
+// window. Runs until ctx is cancelled.
+func runCleanup(ctx context.Context, st *store.Store, uploadsDir string, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			hashes, err := st.ActiveRenderHashes()
+			if err != nil {
+				log.Printf("cleanup: list render hashes: %v", err)
+				continue
+			}
+			keep := make(map[string]bool, len(hashes))
+			for _, h := range hashes {
+				keep[h] = true
+			}
+			removed, err := uploads.Sweep(uploadsDir, keep, interval)
+			if err != nil {
+				log.Printf("cleanup: sweep %s: %v", uploadsDir, err)
+				continue
+			}
+			if removed > 0 {
+				log.Printf("cleanup: removed %d stale cache file(s)", removed)
+			}
+		}
+	}
 }

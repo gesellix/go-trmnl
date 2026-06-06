@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Config holds all runtime configuration for the server.
@@ -31,6 +32,9 @@ type Config struct {
 	// Auth is disabled when AdminPassword is empty.
 	AdminUser     string
 	AdminPassword string
+	// CleanupInterval is how often the rendered-image cache is pruned of
+	// unreferenced files. Zero disables cleanup.
+	CleanupInterval time.Duration
 }
 
 // Load parses configuration from the given args (typically os.Args[1:]),
@@ -45,19 +49,26 @@ func Load(args []string) (*Config, error) {
 	uploads := fs.String("uploads", env("TRMNL_UPLOADS", ""), "Uploads directory (default <data-dir>/uploads)")
 	adminUser := fs.String("admin-user", env("TRMNL_ADMIN_USER", "admin"), "Admin UI username")
 	adminPass := fs.String("admin-password", env("TRMNL_ADMIN_PASSWORD", ""), "Admin UI password (empty disables auth)")
+	cleanup := fs.String("cleanup-interval", env("TRMNL_CLEANUP_INTERVAL", "1h"), "How often to prune the rendered-image cache (e.g. 1h); 0 disables")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
 
+	cleanupInterval, perr := time.ParseDuration(*cleanup)
+	if perr != nil {
+		return nil, fmt.Errorf("invalid cleanup-interval %q: %w", *cleanup, perr)
+	}
+
 	c := &Config{
-		ListenAddr:    *listen,
-		PublicBaseURL: strings.TrimRight(*baseURL, "/"),
-		DataDir:       *dataDir,
-		DBPath:        *dbPath,
-		UploadsDir:    *uploads,
-		AdminUser:     *adminUser,
-		AdminPassword: *adminPass,
+		ListenAddr:      *listen,
+		PublicBaseURL:   strings.TrimRight(*baseURL, "/"),
+		DataDir:         *dataDir,
+		DBPath:          *dbPath,
+		UploadsDir:      *uploads,
+		AdminUser:       *adminUser,
+		AdminPassword:   *adminPass,
+		CleanupInterval: cleanupInterval,
 	}
 
 	if c.PublicBaseURL == "" {
