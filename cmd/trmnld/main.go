@@ -5,11 +5,14 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"net/http"
+	// Embed the timezone database so timezone-aware screens (e.g. the clock
+	// plugin) work on minimal images that lack system tzdata.
+	_ "time/tzdata"
 
 	"github.com/gesellix/go-trmnl/internal/admin"
 	"github.com/gesellix/go-trmnl/internal/config"
@@ -34,7 +37,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if err := cfg.EnsureDirs(); err != nil {
+	if err = cfg.EnsureDirs(); err != nil {
 		return err
 	}
 	if w := cfg.LoopbackWarning(); w != "" {
@@ -45,10 +48,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer st.Close()
+	defer func() { _ = st.Close() }()
 
-	if err := seedExample(st); err != nil {
-		log.Printf("WARNING: seed example content: %v", err)
+	if seedErr := seedExample(st); seedErr != nil {
+		log.Printf("WARNING: seed example content: %v", seedErr)
 	}
 
 	r := server.New()

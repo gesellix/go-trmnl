@@ -125,7 +125,7 @@ func outboundIP() string {
 	if err != nil {
 		return ""
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
 		return addr.IP.String()
 	}

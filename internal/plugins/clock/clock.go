@@ -17,8 +17,13 @@ func init() { plugins.Register(&Plugin{}) }
 // Plugin renders a clock face.
 type Plugin struct{}
 
-func (p *Plugin) Type() string                  { return "clock" }
-func (p *Plugin) Title() string                 { return "Clock" }
+// Type returns the registry key.
+func (p *Plugin) Type() string { return "clock" }
+
+// Title returns the human-friendly plugin name.
+func (p *Plugin) Title() string { return "Clock" }
+
+// DefaultRefresh returns the cache TTL hint for rendered clock screens.
 func (p *Plugin) DefaultRefresh() time.Duration { return time.Minute }
 
 // settings configures the clock screen.
@@ -34,6 +39,7 @@ type data struct {
 	Label string
 }
 
+// DataModel computes the time/date strings to display.
 func (p *Plugin) DataModel(_ context.Context, in plugins.RenderInput) (any, error) {
 	var s settings
 	if len(in.Settings) > 0 {
@@ -56,6 +62,7 @@ func (p *Plugin) DataModel(_ context.Context, in plugins.RenderInput) (any, erro
 	}, nil
 }
 
+// Render draws the clock face to an RGBA image.
 func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*image.RGBA, error) {
 	d, _ := raw.(data)
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))

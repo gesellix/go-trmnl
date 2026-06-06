@@ -53,6 +53,7 @@ func mockServer(t *testing.T) *httptest.Server {
 }
 
 func newMockPlugin(t *testing.T) *Plugin {
+	t.Helper()
 	ts := mockServer(t)
 	p := New()
 	p.forecastBase = ts.URL + "/v1/forecast"

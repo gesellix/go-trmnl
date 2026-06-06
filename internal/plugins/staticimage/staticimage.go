@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+	_ "image/gif"  // register GIF decoder
+	_ "image/jpeg" // register JPEG decoder
+	_ "image/png"  // register PNG decoder
 
 	xdraw "golang.org/x/image/draw"
 
@@ -30,8 +30,13 @@ func init() { plugins.Register(&Plugin{}) }
 // Plugin renders a static uploaded image.
 type Plugin struct{}
 
-func (p *Plugin) Type() string                  { return "staticimage" }
-func (p *Plugin) Title() string                 { return "Static Image" }
+// Type returns the registry key.
+func (p *Plugin) Type() string { return "staticimage" }
+
+// Title returns the human-friendly plugin name.
+func (p *Plugin) Title() string { return "Static Image" }
+
+// DefaultRefresh returns the cache TTL hint; static images change rarely.
 func (p *Plugin) DefaultRefresh() time.Duration { return 24 * time.Hour }
 
 // settings holds the asset filename (relative to the assets dir) to display.
@@ -39,6 +44,7 @@ type settings struct {
 	File string `json:"file"`
 }
 
+// DataModel loads and decodes the configured image file.
 func (p *Plugin) DataModel(_ context.Context, in plugins.RenderInput) (any, error) {
 	var s settings
 	if len(in.Settings) > 0 {
@@ -60,6 +66,7 @@ func (p *Plugin) DataModel(_ context.Context, in plugins.RenderInput) (any, erro
 	return img, nil
 }
 
+// Render scales the decoded image to fit the panel, letterboxed on white.
 func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*image.RGBA, error) {
 	src, ok := raw.(image.Image)
 	if !ok || src == nil {

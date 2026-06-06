@@ -1,6 +1,8 @@
 # Build output
 /trmnld
 /dist/
+/build/
+coverage.out
 
 # Runtime data (database, rendered uploads)
 /data/

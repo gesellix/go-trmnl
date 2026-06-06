@@ -35,6 +35,7 @@ type Problem struct {
 func WriteProblem(w http.ResponseWriter, statusCode int, problemType, statusText, detail, instance string, ext map[string]any) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(statusCode)
+	//nolint:errchkjson // Problem.Extensions is a free-form map; encode errors here are unactionable.
 	_ = json.NewEncoder(w).Encode(Problem{
 		Type:       problemType,
 		Status:     statusText,

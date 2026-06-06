@@ -1,0 +1,89 @@
+# golangci-lint configuration for go-trmnl.
+# See: https://golangci-lint.run/usage/configuration/
+version: "2"
+
+run:
+  tests: true
+
+linters:
+  enable:
+    - errcheck # unchecked errors
+    - staticcheck # static analysis (includes gosimple, stylecheck)
+    - govet # vet
+    - ineffassign # ineffectual assignments
+    - unused # unused constants/vars/funcs/types
+    - misspell # commonly misspelled words
+    - unconvert # unnecessary type conversions
+    - unparam # unused function parameters
+    - gocyclo # cyclomatic complexity
+    - gocritic # opinionated checks
+    - nolintlint # well-formed nolint directives
+    - revive # configurable style linter
+    - predeclared # shadowing predeclared identifiers
+    - thelper # test helpers without t.Helper()
+    - bodyclose # HTTP response bodies are closed
+    - nilerr # returning nil after a non-nil error check
+    - errorlint # error wrapping correctness
+    - errchkjson # types passed to json encoders
+
+  exclusions:
+    rules:
+      # Relax some checks in tests.
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - unparam
+          - bodyclose
+          - govet
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      exclude-functions:
+        - (*os.File).Close
+        - (*bytes.Buffer).Write
+        - (*bytes.Buffer).WriteString
+        - (*database/sql.Rows).Close
+        - (*database/sql.Tx).Rollback
+        - (*database/sql.Stmt).Close
+        - (*database/sql.DB).Close
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment # overly aggressive
+
+    gocyclo:
+      min-complexity: 20
+
+    revive:
+      rules:
+        - name: var-naming
+          arguments: [["ID", "URL", "HTTP", "JSON", "XML", "API", "MAC", "RSSI", "BMP", "PNG", "OTA", "TTL"], []]
+        - name: exported
+        - name: blank-imports
+        - name: context-as-argument
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: unreachable-code
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+output:
+  formats:
+    text:
+      path: stdout
+      colors: true
+  show-stats: true

@@ -36,8 +36,13 @@ func New() *Plugin {
 	}
 }
 
-func (p *Plugin) Type() string                  { return "weather" }
-func (p *Plugin) Title() string                 { return "Weather" }
+// Type returns the registry key.
+func (p *Plugin) Type() string { return "weather" }
+
+// Title returns the human-friendly plugin name.
+func (p *Plugin) Title() string { return "Weather" }
+
+// DefaultRefresh returns the cache TTL hint for rendered weather screens.
 func (p *Plugin) DefaultRefresh() time.Duration { return 30 * time.Minute }
 
 // settings configures the weather screen.
@@ -75,6 +80,7 @@ type DayForecast struct {
 	Lo   float64
 }
 
+// DataModel fetches current conditions and the forecast from Open-Meteo.
 func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, error) {
 	var s settings
 	if len(in.Settings) > 0 {
@@ -212,13 +218,14 @@ func (p *Plugin) getJSON(ctx context.Context, u string, dst any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(dst)
 }
 
+// Render draws the weather screen to an RGBA image.
 func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*image.RGBA, error) {
 	d, ok := raw.(Data)
 	if !ok {

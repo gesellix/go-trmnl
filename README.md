@@ -1,5 +1,7 @@
 # go-trmnl
 
+[![CI](https://github.com/gesellix/go-trmnl/actions/workflows/ci.yml/badge.svg)](https://github.com/gesellix/go-trmnl/actions/workflows/ci.yml)
+
 A self-hosted **BYOS** (Build Your Own Server) for the [TRMNL](https://usetrmnl.com)
 e-ink display, written in Go. It replaces TRMNL's hosted backend so a device on
 your LAN can be provisioned, fetch screens, and report telemetry without their
@@ -74,9 +76,27 @@ are never authenticated, since the device cannot supply credentials.
 Point your TRMNL device's custom server URL at `<base-url>` and it will
 auto-register on its first `/api/setup` call.
 
+## Docker
+
+```sh
+docker build -t go-trmnl .
+docker run -p 8080:8080 -v trmnl-data:/data \
+  -e TRMNL_BASE_URL=http://<your-lan-ip>:8080 \
+  -e TRMNL_ADMIN_PASSWORD=changeme \
+  go-trmnl
+```
+
+The image is a static binary on `distroless/static` (CA certificates included
+for the weather plugin; the timezone database is embedded in the binary).
+
 ## Development
 
 ```sh
-go build ./...
-go test ./... -race
+make build      # static binary into ./build
+make test       # go test -race with coverage
+make lint       # golangci-lint
+make vuln       # govulncheck
 ```
+
+CI runs tests (with `-race`), `golangci-lint`, a cross-platform build matrix,
+`govulncheck`, a Docker build, and CodeQL analysis. See `.github/workflows/`.

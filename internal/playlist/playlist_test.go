@@ -2,6 +2,7 @@ package playlist_test
 
 import (
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestNextScreenNoPlaylist(t *testing.T) {
 	st, _ := store.Open(filepath.Join(t.TempDir(), "t.db"))
 	defer st.Close()
 	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:02", APIKey: "k", FriendlyID: "F2"})
-	if _, err := playlist.NextScreen(st, d); err != playlist.ErrNoScreen {
+	if _, err := playlist.NextScreen(st, d); !errors.Is(err, playlist.ErrNoScreen) {
 		t.Fatalf("err = %v, want ErrNoScreen", err)
 	}
 }

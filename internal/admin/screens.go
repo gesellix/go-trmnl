@@ -146,9 +146,9 @@ func (h *Handler) ScreenUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no file uploaded", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
-	if err := os.MkdirAll(h.assetsDir, 0o755); err != nil {
+	if err = os.MkdirAll(h.assetsDir, 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -158,15 +158,22 @@ func (h *Handler) ScreenUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if _, err := io.Copy(dst, file); err != nil {
-		dst.Close()
+	if _, err = io.Copy(dst, file); err != nil {
+		_ = dst.Close()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	dst.Close()
+	if err = dst.Close(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	settings, _ := json.Marshal(map[string]string{"file": name})
-	if err := h.store.UpdateScreenSettings(id, sc.Name, string(settings)); err != nil {
+	settings, err := json.Marshal(map[string]string{"file": name})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err = h.store.UpdateScreenSettings(id, sc.Name, string(settings)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
