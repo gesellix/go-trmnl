@@ -123,7 +123,13 @@ make build      # static binary into ./build
 make test       # go test -race with coverage
 make lint       # golangci-lint
 make vuln       # govulncheck
+
+# Render a screen to image files without a server or device (plugin dev aid):
+go run ./cmd/trmnl-render -plugin weather -settings '{"location":"Berlin"}' -out weather
 ```
+
+See [Testing screens without a device](docs/GETTING-STARTED.md#testing-screens-without-a-device)
+for previewing screens via the CLI, the admin UI, or a simulated device.
 
 CI runs tests (with `-race`), `golangci-lint`, a cross-platform build matrix,
 `govulncheck`, a Docker build, and CodeQL analysis. A scheduled Security

@@ -190,6 +190,52 @@ Lower the device's refresh rate for faster updates (at the cost of battery).
 
 ---
 
+## Testing screens without a device
+
+You don't need a registered device (or even the server) to see what a screen
+will look like. Three options, from least to most setup:
+
+**1. Render a screen straight to image files (no server, no database).**
+The `trmnl-render` dev tool runs a plugin and writes 1-bit `.bmp` and `.png`
+files you can open locally:
+
+```sh
+go run ./cmd/trmnl-render -list
+go run ./cmd/trmnl-render -plugin clock -settings '{"use_24h":true,"label":"Office"}' -out clock
+go run ./cmd/trmnl-render -plugin weather -settings '{"location":"Berlin"}' -dither threshold -out weather
+```
+
+Flags: `-plugin`, `-settings` (JSON), `-out`, `-dither`
+(`floyd_steinberg`/`threshold`), `-assets` (dir for the static-image plugin),
+`-width`/`-height`. This is the quickest way to iterate on a plugin or settings.
+
+**2. Preview in the admin UI (no device needed).**
+Create a screen under **Admin → Screens**, edit its settings, and click
+**Render preview**. The rendered PNG is shown on the page and served at
+`/uploads/<hash>.png`.
+
+**3. Simulate a real device over HTTP.**
+Because `GET /api/setup` auto-provisions, "registering" is just one request.
+This exercises the full display path (telemetry, playlist selection, caching):
+
+```sh
+BASE=http://localhost:8080
+MAC=AA:BB:CC:DD:EE:FF
+
+# Auto-register and grab the api_key.
+KEY=$(curl -s -H "ID: $MAC" $BASE/api/setup | sed -n 's/.*"api_key":"\([^"]*\)".*/\1/p')
+
+# Assign the seeded "Example" playlist to this simulated device in the admin UI
+# (Devices -> the new device -> Playlist), then fetch its display:
+curl -s -H "ID: $MAC" -H "Access-Token: $KEY" $BASE/api/display
+
+# Download the image it points at:
+curl -s -o screen.bmp "$BASE/uploads/$(curl -s -H "ID: $MAC" -H "Access-Token: $KEY" $BASE/api/display | sed -n 's/.*"filename":"\([^"]*\)".*/\1/p').bmp"
+```
+
+(Until you assign a non-empty playlist to the simulated device, `/api/display`
+returns the placeholder image — see [Device API reference](API.md).)
+
 ## Configuration
 
 All settings are flags or environment variables (flags win):
