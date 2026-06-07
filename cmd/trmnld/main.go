@@ -31,6 +31,7 @@ import (
 	// Register built-in screen plugins.
 	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
 	_ "github.com/gesellix/go-trmnl/internal/plugins/daysleft"
+	_ "github.com/gesellix/go-trmnl/internal/plugins/quote"
 	_ "github.com/gesellix/go-trmnl/internal/plugins/staticimage"
 	_ "github.com/gesellix/go-trmnl/internal/plugins/weather"
 )
