@@ -1,9 +1,45 @@
 package secret
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestLoadOrCreateKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "secret.key")
+
+	key, created, err := LoadOrCreateKey(path)
+	if err != nil || !created || key == "" {
+		t.Fatalf("first call: key=%q created=%v err=%v", key, created, err)
+	}
+	if fi, err := os.Stat(path); err != nil {
+		t.Fatalf("key file not written: %v", err)
+	} else if fi.Mode().Perm() != 0o600 {
+		t.Errorf("key file mode = %v, want 0600", fi.Mode().Perm())
+	}
+
+	// Second call returns the same key and does not recreate it.
+	key2, created2, err := LoadOrCreateKey(path)
+	if err != nil || created2 || key2 != key {
+		t.Errorf("second call: key=%q created=%v err=%v, want stable + created=false", key2, created2, err)
+	}
+
+	// The generated key drives a working box.
+	if got, _ := New(key).Decrypt(mustEncrypt(t, New(key), "x")); got != "x" {
+		t.Errorf("generated key does not round-trip: %q", got)
+	}
+}
+
+func mustEncrypt(t *testing.T, b *Box, s string) string {
+	t.Helper()
+	ct, err := b.Encrypt(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ct
+}
 
 func TestRoundTripV2(t *testing.T) {
 	b := New("a-passphrase")

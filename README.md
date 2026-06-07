@@ -67,12 +67,19 @@ Full walkthrough: **[Getting started](docs/GETTING-STARTED.md)**.
 
 Flags or environment variables (flags win). The essentials:
 
-| Flag              | Env                    | Default       | Purpose                                        |
-|-------------------|------------------------|---------------|------------------------------------------------|
-| `-base-url`       | `TRMNL_BASE_URL`       | auto (LAN IP) | Public URL the device uses to reach the server |
-| `-data-dir`       | `TRMNL_DATA_DIR`       | `./data`      | Root for the SQLite database and uploads       |
-| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)       | Admin UI password; empty disables auth         |
-| `-secret-key`     | `TRMNL_SECRET_KEY`     | (empty)       | Encrypts calendar credentials at rest          |
+| Flag              | Env                    | Default        | Purpose                                        |
+|-------------------|------------------------|----------------|------------------------------------------------|
+| `-base-url`       | `TRMNL_BASE_URL`       | auto (LAN IP)  | Public URL the device uses to reach the server |
+| `-data-dir`       | `TRMNL_DATA_DIR`       | `./data`       | Root for the SQLite database and uploads       |
+| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)        | Admin UI password; empty disables auth         |
+| `-secret-key`     | `TRMNL_SECRET_KEY`     | auto-generated | Key to encrypt stored credentials at rest      |
+| `-no-encryption`  | `TRMNL_NO_ENCRYPTION`  | `false`        | Store credentials in plaintext                 |
+
+Sensitive stored credentials are **encrypted at rest by default** (the calendar
+plugin's OAuth tokens, CalDAV passwords and OAuth client secrets are the first
+users). If you don't set `-secret-key`, a key is generated and saved to
+`<data-dir>/secret.key` on first start; back it up, because losing it means
+re-entering those credentials. Pass `-no-encryption` to store plaintext instead.
 
 The `/admin` UI uses HTTP Basic Auth when a password is set. Device endpoints
 (`/api/*`) and `/uploads` are unauthenticated, since the firmware cannot supply
@@ -123,4 +130,4 @@ for previewing screens via the CLI, the admin UI, or a simulated device.
 CI runs tests (`-race`), `golangci-lint`, a cross-platform build matrix,
 `govulncheck`, a Docker build and CodeQL. Pushing a `vX.Y.Z` tag triggers the
 release workflow (binaries + checksums, a GitHub release, and a multi-arch image
-on GHCR). See [`.github/workflows/`](.github/workflows/).
+on GHCR). The workflow definitions live under `.github/workflows/`.

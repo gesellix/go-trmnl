@@ -251,12 +251,26 @@ All settings are flags or environment variables (flags win):
 | `-admin-password`       | `TRMNL_ADMIN_PASSWORD`       | (empty)               | Admin UI password; empty disables auth                                             |
 | `-cleanup-interval`     | `TRMNL_CLEANUP_INTERVAL`     | `1h`                  | How often to prune the image cache; `0` disables                                   |
 | `-log-retention`        | `TRMNL_LOG_RETENTION`        | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables                    |
-| `-secret-key`           | `TRMNL_SECRET_KEY`           | (empty)               | Encrypts calendar credentials at rest (OAuth client secrets/tokens, CalDAV passwords); empty stores them as plaintext |
+| `-secret-key`           | `TRMNL_SECRET_KEY`           | auto-generated        | Key to encrypt stored credentials at rest; default is a key generated under the data dir |
+| `-no-encryption`        | `TRMNL_NO_ENCRYPTION`        | `false`               | Store credentials in plaintext instead of encrypting them                          |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
 Google OAuth clients and calendar accounts are configured entirely in
 **Admin → Calendar**; see the
 [Family Calendar plugin](plugins/familycalendar.md) docs.
+
+### Credential encryption
+
+Sensitive credentials stored in the database are **encrypted at rest by default**
+(AES-256-GCM, key derived with scrypt). This is a general mechanism; the calendar
+plugin (OAuth tokens, CalDAV passwords, OAuth client secrets) is the first user.
+On first start, if you have not set `-secret-key` / `TRMNL_SECRET_KEY`, a random
+key is generated and saved to `<data-dir>/secret.key` (mode `0600`), logged once.
+**Back up that key (or set your own):** if it is lost, the encrypted values cannot
+be read and must be re-entered. Provide your own key with `-secret-key` to keep it
+outside the data dir. To store credentials in plaintext instead, pass
+`-no-encryption` (a warning is logged). Existing plaintext entries are encrypted
+automatically on the next start once a key is in effect.
 
 ### Rendered-image cache
 
