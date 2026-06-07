@@ -253,6 +253,7 @@ All settings are flags or environment variables (flags win):
 | `-log-retention`  | `TRMNL_LOG_RETENTION`  | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables |
 | `-google-client-id` | `TRMNL_GOOGLE_CLIENT_ID` | (empty)          | Google OAuth client ID for the [Family Calendar](plugins/familycalendar.md) plugin |
 | `-google-client-secret` | `TRMNL_GOOGLE_CLIENT_SECRET` | (empty)  | Google OAuth client secret; empty disables Google calendars |
+| (env only)        | `TRMNL_SECRET_KEY`     | (empty)               | Encrypts calendar OAuth tokens at rest; empty stores them as plaintext |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
 Connecting Google calendars is described in the
