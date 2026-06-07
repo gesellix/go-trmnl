@@ -101,6 +101,18 @@ type CalendarAccount struct {
 	CreatedAt       int64
 }
 
+// OAuthClient is a stored OAuth application credential (e.g. a Google Cloud
+// OAuth client) that calendar accounts authorize against. ClientSecret is
+// encrypted at rest when a secret key is configured.
+type OAuthClient struct {
+	ID           int64
+	Provider     string
+	Name         string
+	ClientID     string
+	ClientSecret string
+	CreatedAt    int64
+}
+
 // CalendarEvent is one cached event instance belonging to an account.
 type CalendarEvent struct {
 	ID        int64
