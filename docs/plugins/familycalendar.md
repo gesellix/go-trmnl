@@ -38,6 +38,10 @@ and an iCloud account for a child).
 { "label": "Family", "accounts": [1, 2], "days": 14, "use_24h": true }
 ```
 
+In the admin UI you don't edit this JSON directly: the screen editor shows a
+checklist of your calendar accounts (by name) plus fields for the options above.
+Leave all accounts unchecked to include every account.
+
 Cache TTL hint: ~15 minutes (how often a device re-fetches the rendered screen).
 The underlying calendar data is refreshed per account on its own interval
 (default 12h, set per account in **Admin → Calendar**).
@@ -136,8 +140,9 @@ the account needs two-factor authentication enabled.
    - a **marker** and **refresh interval**.
 3. Submit. go-trmnl discovers your calendars and runs an initial sync (any auth
    error shows on the account row). Open the account to pick which calendars to
-   include and adjust name/marker/refresh; leaving none selected includes all
-   event calendars.
+   include and adjust name/marker/refresh. With none selected, CalDAV defaults
+   to the **first discovered calendar** (CalDAV has no reliable "primary", so
+   pick the ones you want explicitly).
 
 No global configuration is needed for CalDAV. App-specific passwords are stored
 the same way as Google tokens (encrypted when `TRMNL_SECRET_KEY` is set).
