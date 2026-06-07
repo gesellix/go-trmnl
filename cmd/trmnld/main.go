@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -71,11 +72,14 @@ func run() error {
 	// Family calendar: shared account/OAuth-client store + provider sync. OAuth
 	// clients are configured in the admin UI; the OAuth redirect URI is derived
 	// per-request from the host the admin browses (see internal/admin).
-	secretBox := secret.New(cfg.SecretKey)
+	secretBox, err := resolveSecretBox(cfg)
+	if err != nil {
+		return err
+	}
 	cal := calendar.NewService(st, secretBox)
 	plugins.Register(familycalendar.New(cal))
 	if !secretBox.Enabled() {
-		log.Printf("note: calendar credentials are stored unencrypted (set -secret-key/TRMNL_SECRET_KEY to enable encryption at rest)")
+		log.Printf("WARNING: credential encryption is disabled (-no-encryption); stored credentials are saved in plaintext")
 	} else if n, err := cal.MigrateEncryption(); err != nil {
 		log.Printf("calendar: secret migration: %v", err)
 	} else if n > 0 {
@@ -109,6 +113,30 @@ func run() error {
 
 	log.Printf("trmnld %s listening on %s (public base URL %s)", version, cfg.ListenAddr, cfg.PublicBaseURL)
 	return server.Run(ctx, cfg.ListenAddr, r)
+}
+
+// resolveSecretBox builds the at-rest encryption box. Encryption is on by
+// default: an explicit -secret-key/TRMNL_SECRET_KEY wins; otherwise a key is
+// generated and persisted under the data dir. -no-encryption opts out and
+// stores plaintext. Failing to establish the default key is fatal rather than
+// silently downgrading to plaintext.
+func resolveSecretBox(cfg *config.Config) (*secret.Box, error) {
+	switch {
+	case cfg.DisableEncryption:
+		return secret.New(""), nil
+	case cfg.SecretKey != "":
+		return secret.New(cfg.SecretKey), nil
+	default:
+		keyPath := filepath.Join(cfg.DataDir, "secret.key")
+		key, created, err := secret.LoadOrCreateKey(keyPath)
+		if err != nil {
+			return nil, fmt.Errorf("encryption key %s: %w (or run with -no-encryption to store plaintext)", keyPath, err)
+		}
+		if created {
+			log.Printf("generated a new credential encryption key at %s; back it up — if it is lost, encrypted credentials must be re-entered", keyPath)
+		}
+		return secret.New(key), nil
+	}
 }
 
 // runMaintenance periodically prunes the rendered-image cache (files not

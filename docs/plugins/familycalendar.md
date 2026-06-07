@@ -176,8 +176,9 @@ deduplication and drawing without any network access.
   for events without a UID. Recurring instances stay distinct.
 - All-day events are labeled "all day" and grouped on their date.
 - Credentials (OAuth tokens, CalDAV passwords, OAuth client secrets) are stored
-  in the local SQLite database. Set `-secret-key` / `TRMNL_SECRET_KEY` to encrypt
-  them at rest: AES-256-GCM with a key derived via scrypt. Without a key they are
-  stored as plaintext. Values written while a key is set cannot be read after the
-  key is removed or changed, so back up the key. On startup, plaintext entries
-  are automatically encrypted to the current format.
+  in the local SQLite database and **encrypted at rest by default** (AES-256-GCM,
+  key derived with scrypt). With no `-secret-key` / `TRMNL_SECRET_KEY` set, a key
+  is generated on first start and saved to `<data-dir>/secret.key` (logged once);
+  back it up, since losing it means re-entering the encrypted credentials. Pass
+  `-secret-key` to supply your own, or `-no-encryption` to store plaintext.
+  Existing plaintext entries are encrypted automatically on the next start.

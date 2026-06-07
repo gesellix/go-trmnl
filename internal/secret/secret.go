@@ -72,6 +72,29 @@ func New(key string) *Box {
 	return &Box{aead: gcm, enabled: true}
 }
 
+// LoadOrCreateKey returns the key stored at path, creating it with a fresh
+// random value (file mode 0600) when absent or empty. This lets encryption be
+// on by default: the operator does not have to manage a key, while an explicit
+// TRMNL_SECRET_KEY still takes precedence. Note the key sits next to the
+// database, so it mainly protects the database file in isolation (e.g. a stray
+// copy or backup), not a full data-directory compromise.
+func LoadOrCreateKey(path string) (key string, created bool, err error) {
+	if b, rerr := os.ReadFile(path); rerr == nil {
+		if k := strings.TrimSpace(string(b)); k != "" {
+			return k, false, nil
+		}
+	}
+	buf := make([]byte, 32)
+	if _, rerr := io.ReadFull(rand.Reader, buf); rerr != nil {
+		return "", false, rerr
+	}
+	key = base64.StdEncoding.EncodeToString(buf)
+	if werr := os.WriteFile(path, []byte(key+"\n"), 0o600); werr != nil {
+		return "", false, werr
+	}
+	return key, true, nil
+}
+
 // Enabled reports whether a key is configured.
 func (b *Box) Enabled() bool { return b != nil && b.enabled }
 

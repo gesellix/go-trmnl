@@ -39,9 +39,13 @@ type Config struct {
 	// LogRetention is how long device log entries are kept before pruning.
 	// Zero disables log pruning.
 	LogRetention time.Duration
-	// SecretKey encrypts sensitive calendar credentials at rest (OAuth client
-	// secrets and tokens, CalDAV passwords). Empty stores them as plaintext.
+	// SecretKey encrypts sensitive stored credentials at rest (currently the
+	// calendar plugin's OAuth tokens/client secrets and CalDAV passwords). When
+	// empty, a key is generated and persisted under DataDir (encryption is on by
+	// default).
 	SecretKey string
+	// DisableEncryption opts out of encryption, storing credentials in plaintext.
+	DisableEncryption bool
 }
 
 // Load parses configuration from the given args (typically os.Args[1:]),
@@ -58,7 +62,8 @@ func Load(args []string) (*Config, error) {
 	adminPass := fs.String("admin-password", env("TRMNL_ADMIN_PASSWORD", ""), "Admin UI password (empty disables auth)")
 	cleanup := fs.String("cleanup-interval", env("TRMNL_CLEANUP_INTERVAL", "1h"), "How often to prune the rendered-image cache (e.g. 1h); 0 disables")
 	logRetention := fs.String("log-retention", env("TRMNL_LOG_RETENTION", "32d"), "How long to keep device logs (e.g. 32d, 720h); 0 disables")
-	secretKey := fs.String("secret-key", env("TRMNL_SECRET_KEY", ""), "Key to encrypt calendar credentials at rest (empty stores them as plaintext)")
+	secretKey := fs.String("secret-key", env("TRMNL_SECRET_KEY", ""), "Key to encrypt stored credentials at rest (default: a key auto-generated under the data dir)")
+	noEncryption := fs.Bool("no-encryption", envBool("TRMNL_NO_ENCRYPTION"), "Store credentials in plaintext instead of encrypting them")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -74,16 +79,17 @@ func Load(args []string) (*Config, error) {
 	}
 
 	c := &Config{
-		ListenAddr:      *listen,
-		PublicBaseURL:   strings.TrimRight(*baseURL, "/"),
-		DataDir:         *dataDir,
-		DBPath:          *dbPath,
-		UploadsDir:      *uploads,
-		AdminUser:       *adminUser,
-		AdminPassword:   *adminPass,
-		CleanupInterval: cleanupInterval,
-		LogRetention:    logRetentionDur,
-		SecretKey:       *secretKey,
+		ListenAddr:        *listen,
+		PublicBaseURL:     strings.TrimRight(*baseURL, "/"),
+		DataDir:           *dataDir,
+		DBPath:            *dbPath,
+		UploadsDir:        *uploads,
+		AdminUser:         *adminUser,
+		AdminPassword:     *adminPass,
+		CleanupInterval:   cleanupInterval,
+		LogRetention:      logRetentionDur,
+		SecretKey:         *secretKey,
+		DisableEncryption: *noEncryption,
 	}
 
 	if c.PublicBaseURL == "" {
@@ -177,4 +183,15 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// envBool reads a boolean environment variable. "1", "true", "yes" (any case)
+// are true; anything else (including unset) is false.
+func envBool(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
 }
