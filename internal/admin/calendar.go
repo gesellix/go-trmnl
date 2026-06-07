@@ -148,7 +148,10 @@ func (h *Handler) CalendarGoogleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
+	// The state cookie is a short-lived OAuth CSRF nonce. Secure is set only on
+	// HTTPS requests: this server commonly runs over plain HTTP on a LAN, where a
+	// Secure cookie would not be sent and would break the consent flow.
+	http.SetCookie(w, &http.Cookie{ // nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 		Name:     oauthStateCookie,
 		Value:    nonce + "|" + i64(clientID),
 		Path:     "/admin",
@@ -173,7 +176,8 @@ func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid OAuth state", http.StatusBadRequest)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
+	// Clear the state cookie; Secure mirrors the request scheme as above.
+	http.SetCookie(w, &http.Cookie{ // nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 		Name:     oauthStateCookie,
 		Value:    "",
 		Path:     "/admin",
