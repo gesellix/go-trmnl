@@ -1,6 +1,29 @@
 {{define "content"}}
 <h1>Calendar accounts</h1>
 
+{{if .Accounts}}
+<table class="list">
+  <thead><tr><th>Name</th><th>Provider</th><th>Marker</th><th>Refresh</th><th>Last sync</th><th></th></tr></thead>
+  <tbody>
+  {{range .Accounts}}
+    <tr>
+      <td><a href="/admin/calendar/{{.ID}}">{{.Name}}</a>{{if .Error}}<br><span class="muted">error: {{.Error}}</span>{{end}}</td>
+      <td>{{.Provider}}</td>
+      <td>{{.Marker}}</td>
+      <td>{{.Refresh}}</td>
+      <td>{{.LastSync}}</td>
+      <td>
+        <form method="post" action="/admin/calendar/{{.ID}}/sync" class="inline"><button type="submit">Sync now</button></form>
+        <form method="post" action="/admin/calendar/{{.ID}}/delete" class="inline" onsubmit="return confirm('Remove this account?')"><button type="submit" class="danger">Delete</button></form>
+      </td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No calendar accounts yet. Add one below.</p>
+{{end}}
+
 <h2>Google OAuth clients</h2>
 <p class="muted">Create an OAuth client in your
 <a href="https://console.cloud.google.com/">Google Cloud project</a> (Calendar
@@ -56,27 +79,4 @@ project).</p>
   <label>Refresh every (hours) <input type="number" name="refresh_hours" value="12" min="1" step="1"></label>
   <button type="submit">Add CalDAV account</button>
 </form>
-
-{{if .Accounts}}
-<table class="list">
-  <thead><tr><th>Name</th><th>Provider</th><th>Marker</th><th>Refresh</th><th>Last sync</th><th></th></tr></thead>
-  <tbody>
-  {{range .Accounts}}
-    <tr>
-      <td><a href="/admin/calendar/{{.ID}}">{{.Name}}</a>{{if .Error}}<br><span class="muted">error: {{.Error}}</span>{{end}}</td>
-      <td>{{.Provider}}</td>
-      <td>{{.Marker}}</td>
-      <td>{{.Refresh}}</td>
-      <td>{{.LastSync}}</td>
-      <td>
-        <form method="post" action="/admin/calendar/{{.ID}}/sync" class="inline"><button type="submit">Sync now</button></form>
-        <form method="post" action="/admin/calendar/{{.ID}}/delete" class="inline" onsubmit="return confirm('Remove this account?')"><button type="submit" class="danger">Delete</button></form>
-      </td>
-    </tr>
-  {{end}}
-  </tbody>
-</table>
-{{else}}
-<p class="muted">No calendar accounts yet.</p>
-{{end}}
 {{end}}
