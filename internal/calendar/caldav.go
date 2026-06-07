@@ -125,9 +125,8 @@ func (s *caldavSource) Fetch(ctx context.Context, w Window) ([]Event, error) {
 				continue
 			}
 			for _, ev := range obj.Data.Events() {
-				if e, ok := mapICalEvent(&ev, s.acc.ID, marker); ok {
-					out = append(out, e)
-				}
+				ev := ev
+				out = append(out, expandEvent(&ev, w, s.acc.ID, marker)...)
 			}
 		}
 	}
@@ -149,6 +148,36 @@ func supportsEvents(cal caldav.Calendar) bool {
 }
 
 // mapICalEvent converts a parsed VEVENT into our normalized Event.
+// expandEvent maps a VEVENT to one or more normalized events. A non-recurring
+// event yields a single event; a recurring one (RRULE) is expanded client-side
+// into its occurrences within the window, since iCloud will not expand
+// server-side. Each occurrence keeps the series UID, so distinct start times
+// remain distinct rows and still deduplicate across accounts.
+func expandEvent(ev *ical.Event, w Window, accountID int64, marker []string) []Event {
+	base, ok := mapICalEvent(ev, accountID, marker)
+	if !ok {
+		return nil
+	}
+	set, err := ev.RecurrenceSet(time.Local)
+	if err != nil || set == nil {
+		// Not recurring (or an unparseable rule): emit the event as-is.
+		return []Event{base}
+	}
+	dur := base.End.Sub(base.Start)
+	var out []Event
+	for _, start := range set.Between(w.From, w.To, true) {
+		e := base
+		e.Start = start
+		if dur > 0 {
+			e.End = start.Add(dur)
+		} else {
+			e.End = start
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
 func mapICalEvent(ev *ical.Event, accountID int64, marker []string) (Event, bool) {
 	if status, _ := ev.Status(); status == ical.EventCancelled {
 		return Event{}, false
