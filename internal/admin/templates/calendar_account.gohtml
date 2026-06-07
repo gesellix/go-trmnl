@@ -1,0 +1,28 @@
+{{define "content"}}
+<p><a href="/admin/calendar">&larr; Calendar accounts</a></p>
+<h1>{{.Name}} <span class="muted">({{.Provider}})</span></h1>
+{{if .Email}}<p class="muted">{{.Email}}</p>{{end}}
+
+<form method="post" action="/admin/calendar/{{.ID}}">
+  <label>Name <input type="text" name="name" value="{{.Name}}"></label>
+  <label>Marker (1-2 chars shown on the agenda) <input type="text" name="marker" value="{{.Marker}}" maxlength="2" size="3"></label>
+  <label>Refresh every (hours) <input type="number" name="refresh_hours" value="{{.RefreshHours}}" min="1" step="1"></label>
+
+  <h2>Calendars to include</h2>
+  {{if .ListError}}
+    <p class="muted">Could not list calendars: {{.ListError}}</p>
+  {{else if .Calendars}}
+    {{range .Calendars}}
+    <label class="check">
+      <input type="checkbox" name="calendar_ids" value="{{.ID}}" {{if .Selected}}checked{{end}}>
+      {{.Summary}}{{if .Primary}} (primary){{end}}
+    </label>
+    {{end}}
+    <p class="muted">None selected falls back to the primary calendar.</p>
+  {{else}}
+    <p class="muted">No calendars found.</p>
+  {{end}}
+
+  <button type="submit">Save &amp; sync</button>
+</form>
+{{end}}

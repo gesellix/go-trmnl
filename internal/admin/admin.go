@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/render"
 	"github.com/gesellix/go-trmnl/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -33,10 +34,12 @@ type Handler struct {
 	renderer   *render.Renderer
 	tmpl       *templateSet
 	auth       Auth
+	cal        *calendar.Service
 }
 
 // New creates the admin handler. auth guards the UI when its Password is set.
-func New(st *store.Store, baseURL, uploadsDir string, auth Auth) *Handler {
+// cal powers the family calendar account pages; it may be nil.
+func New(st *store.Store, baseURL, uploadsDir string, auth Auth, cal *calendar.Service) *Handler {
 	return &Handler{
 		store:      st,
 		baseURL:    baseURL,
@@ -45,6 +48,7 @@ func New(st *store.Store, baseURL, uploadsDir string, auth Auth) *Handler {
 		renderer:   render.NewRenderer(uploadsDir),
 		tmpl:       mustParseTemplates(),
 		auth:       auth,
+		cal:        cal,
 	}
 }
 
@@ -104,6 +108,14 @@ func (h *Handler) Routes(r chi.Router) {
 
 		r.Get("/settings", h.SettingsPage)
 		r.Post("/settings", h.SettingsSave)
+
+		r.Get("/calendar", h.CalendarList)
+		r.Get("/calendar/google/start", h.CalendarGoogleStart)
+		r.Get("/oauth/google/callback", h.CalendarGoogleCallback)
+		r.Get("/calendar/{id}", h.CalendarAccountDetail)
+		r.Post("/calendar/{id}", h.CalendarAccountUpdate)
+		r.Post("/calendar/{id}/sync", h.CalendarAccountSync)
+		r.Post("/calendar/{id}/delete", h.CalendarAccountDelete)
 	})
 }
 

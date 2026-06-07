@@ -25,7 +25,7 @@ func newAdminServer(t *testing.T) (*httptest.Server, *store.Store) {
 	}
 	t.Cleanup(func() { st.Close() })
 	r := server.New()
-	admin.New(st, "http://test.local", dir, admin.Auth{}).Routes(r)
+	admin.New(st, "http://test.local", dir, admin.Auth{}, nil).Routes(r)
 	ts := httptest.NewServer(r)
 	t.Cleanup(ts.Close)
 	// Don't follow redirects, so we can assert on 302 Location.
@@ -97,7 +97,7 @@ func TestAdminAuth(t *testing.T) {
 	}
 	t.Cleanup(func() { st.Close() })
 	r := server.New()
-	admin.New(st, "http://test.local", dir, admin.Auth{User: "admin", Password: "s3cret"}).Routes(r)
+	admin.New(st, "http://test.local", dir, admin.Auth{User: "admin", Password: "s3cret"}, nil).Routes(r)
 	ts := httptest.NewServer(r)
 	t.Cleanup(ts.Close)
 	ts.Client().CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }

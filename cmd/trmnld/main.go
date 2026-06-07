@@ -18,8 +18,11 @@ import (
 	_ "time/tzdata"
 
 	"github.com/gesellix/go-trmnl/internal/admin"
+	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/config"
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
+	"github.com/gesellix/go-trmnl/internal/plugins"
+	"github.com/gesellix/go-trmnl/internal/plugins/familycalendar"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
 	"github.com/gesellix/go-trmnl/internal/uploads"
@@ -62,6 +65,15 @@ func run() error {
 		log.Printf("WARNING: seed example content: %v", seedErr)
 	}
 
+	// Family calendar: shared account store + provider sync. The OAuth redirect
+	// URI must match the one registered in the Google Cloud OAuth client.
+	googleOAuth := calendar.NewGoogleOAuth(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.PublicBaseURL+"/admin/oauth/google/callback")
+	cal := calendar.NewService(st, googleOAuth)
+	plugins.Register(familycalendar.New(cal))
+	if !googleOAuth.Configured() {
+		log.Printf("note: family calendar Google integration disabled (set TRMNL_GOOGLE_CLIENT_ID/SECRET to enable)")
+	}
+
 	r := server.New()
 
 	// Firmware-facing device API.
@@ -77,13 +89,16 @@ func run() error {
 	admin.New(st, cfg.PublicBaseURL, cfg.UploadsDir, admin.Auth{
 		User:     cfg.AdminUser,
 		Password: cfg.AdminPassword,
-	}).Routes(r)
+	}, cal).Routes(r)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	if cfg.CleanupInterval > 0 || cfg.LogRetention > 0 {
 		go runMaintenance(ctx, st, cfg.UploadsDir, cfg.CleanupInterval, cfg.LogRetention)
+	}
+	if googleOAuth.Configured() {
+		go runCalendarSync(ctx, cal)
 	}
 
 	log.Printf("trmnld %s listening on %s (public base URL %s)", version, cfg.ListenAddr, cfg.PublicBaseURL)
@@ -116,6 +131,29 @@ func runMaintenance(ctx context.Context, st *store.Store, uploadsDir string, cle
 				} else if n > 0 {
 					log.Printf("maintenance: pruned %d old log entry(ies)", n)
 				}
+			}
+		}
+	}
+}
+
+// runCalendarSync periodically refreshes the calendar event cache. Each account
+// is synced no more often than its own refresh interval; the loop wakes on the
+// smallest configured interval (clamped) so newly added or manually changed
+// accounts are picked up promptly. It runs until ctx is cancelled.
+func runCalendarSync(ctx context.Context, cal *calendar.Service) {
+	// Initial sync shortly after startup so screens have data without waiting.
+	if err := cal.SyncDue(ctx, time.Now()); err != nil {
+		log.Printf("calendar sync: %v", err)
+	}
+	for {
+		timer := time.NewTimer(cal.NextWake())
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+			if err := cal.SyncDue(ctx, time.Now()); err != nil {
+				log.Printf("calendar sync: %v", err)
 			}
 		}
 	}
