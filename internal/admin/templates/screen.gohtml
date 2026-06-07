@@ -15,9 +15,22 @@
           <option value="threshold" {{if eq .DitherMode "threshold"}}selected{{end}}>Threshold (sharp, for text/UI)</option>
         </select>
       </label>
+      {{if .IsFamilyCalendar}}
+      <p>Calendar accounts to show <span class="muted">(none selected = all)</span></p>
+      {{range .FCAccounts}}
+      <label class="check"><input type="checkbox" name="accounts" value="{{.ID}}" {{if .Selected}}checked{{end}}> {{.Name}} <span class="muted">({{.Provider}}{{if .Marker}}, {{.Marker}}{{end}})</span></label>
+      {{else}}
+      <p class="muted">No calendar accounts yet — add them under <a href="/admin/calendar">Calendar</a>.</p>
+      {{end}}
+      <label>Days ahead <input type="number" name="days" value="{{.FCDays}}" min="1" step="1"></label>
+      <label>Max events <input type="number" name="max_events" value="{{.FCMaxEvents}}" min="1" step="1"></label>
+      <label>Label <input type="text" name="label" value="{{.FCLabel}}"></label>
+      <label class="check"><input type="checkbox" name="use_24h" {{if .FCUse24h}}checked{{end}}> 24-hour times</label>
+      {{else}}
       <label>Settings (JSON)
         <textarea name="settings_json" rows="10">{{$s.SettingsJSON}}</textarea>
       </label>
+      {{end}}
       <button type="submit">Save</button>
     </form>
 
