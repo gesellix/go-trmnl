@@ -25,11 +25,11 @@ for the same MAC returns the existing credentials (idempotent).
 
 **Request headers**
 
-| Header        | Required | Notes                              |
-|---------------|----------|------------------------------------|
-| `ID`          | yes      | MAC address, e.g. `AA:BB:CC:DD:EE:FF` |
-| `FW-Version`  | no       | Firmware version, stored as telemetry |
-| `Model`       | no       | Hardware model, stored as telemetry   |
+| Header       | Required | Notes                                 |
+|--------------|----------|---------------------------------------|
+| `ID`         | yes      | MAC address, e.g. `AA:BB:CC:DD:EE:FF` |
+| `FW-Version` | no       | Firmware version, stored as telemetry |
+| `Model`      | no       | Hardware model, stored as telemetry   |
 
 **Response `200`**
 
@@ -56,18 +56,18 @@ screen, ensures a rendered 800×480 1-bit image exists, and returns it.
 
 **Request headers**
 
-| Header             | Required | Notes                                   |
-|--------------------|----------|-----------------------------------------|
-| `ID`               | yes      | MAC address                             |
-| `Access-Token`     | yes      | The `api_key` returned from setup       |
-| `FW-Version`       | no       | Firmware version                        |
-| `Model`            | no       | Hardware model                          |
-| `Battery-Voltage`  | no       | Volts, float                            |
-| `RSSI`             | no       | Wi-Fi signal, dBm                       |
-| `Width`/`Height`   | no       | Panel dimensions                        |
-| `Refresh-Rate`     | no       | Last refresh rate the device used       |
-| `Battery-Charging` / `USB-Connected` | no | Charging state                  |
-| `WiFi-Status`      | no       | e.g. `connected`                        |
+| Header                               | Required | Notes                             |
+|--------------------------------------|----------|-----------------------------------|
+| `ID`                                 | yes      | MAC address                       |
+| `Access-Token`                       | yes      | The `api_key` returned from setup |
+| `FW-Version`                         | no       | Firmware version                  |
+| `Model`                              | no       | Hardware model                    |
+| `Battery-Voltage`                    | no       | Volts, float                      |
+| `RSSI`                               | no       | Wi-Fi signal, dBm                 |
+| `Width`/`Height`                     | no       | Panel dimensions                  |
+| `Refresh-Rate`                       | no       | Last refresh rate the device used |
+| `Battery-Charging` / `USB-Connected` | no       | Charging state                    |
+| `WiFi-Status`                        | no       | e.g. `connected`                  |
 
 **Response `200`**
 
