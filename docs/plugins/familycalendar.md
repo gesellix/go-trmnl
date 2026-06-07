@@ -15,10 +15,14 @@ short marker badge, e.g. `M` for Mom). Calendar screens then just pick which
 accounts to show and how. A background job syncs each account into a local
 cache on its own schedule; screens render from that cache, so they stay fast.
 
-Currently supported account providers:
+Supported account providers:
 
-- **Google** (OAuth2) — see [Setting up Google](#setting-up-google) below.
-- **Apple / CalDAV** — planned; the provider layer is already in place.
+- **Google** (OAuth2) — see [Setting up Google](#setting-up-google).
+- **Apple iCloud / CalDAV** (app-specific password) — see
+  [Setting up Apple and CalDAV](#setting-up-apple-and-caldav).
+
+You can mix several accounts of either type (e.g. one Google account per parent
+and an iCloud account for a child).
 
 ## Settings
 
@@ -108,6 +112,28 @@ page shows that Google integration is disabled.
 `accounts` setting to choose which accounts this screen shows (omit it to show
 all).
 
+## Setting up Apple and CalDAV
+
+Apple iCloud (and generic CalDAV servers) use HTTP basic auth. For iCloud you
+must use an **app-specific password**, not your normal Apple ID password, and
+the account needs two-factor authentication enabled.
+
+1. At [appleid.apple.com](https://appleid.apple.com) → **Sign-In and Security →
+   App-Specific Passwords**, generate a password for go-trmnl.
+2. **Admin → Calendar →** under *Apple iCloud / CalDAV*, fill in:
+   - **Apple ID / username** (your iCloud email),
+   - **App-specific password** (the one you just generated),
+   - **Server** — leave as `https://caldav.icloud.com` for iCloud, or point it
+     at another CalDAV server,
+   - a **marker** and **refresh interval**.
+3. Submit. go-trmnl discovers your calendars and runs an initial sync (any auth
+   error shows on the account row). Open the account to pick which calendars to
+   include and adjust name/marker/refresh; leaving none selected includes all
+   event calendars.
+
+No global configuration is needed for CalDAV. App-specific passwords are stored
+the same way as Google tokens (encrypted when `TRMNL_SECRET_KEY` is set).
+
 ## How to test
 
 The plugin reads from the local event cache, so pass a database path to the
@@ -126,8 +152,10 @@ deduplication and drawing without any network access.
 
 ## Notes
 
-- Recurring events are expanded server-side by Google (so weekly meetings show
-  as individual instances). Cancelled instances are dropped.
+- Recurring events are expanded server-side (Google via the API, CalDAV via the
+  `expand` REPORT) so weekly meetings show as individual instances. Cancelled
+  instances are dropped. A CalDAV server that does not support `expand` will
+  return an error on sync (visible on the account row).
 - Deduplication keys on the iCalUID plus start time, with a title+time fallback
   for events without a UID. Recurring instances stay distinct.
 - All-day events are labeled "all day" and grouped on their date.
