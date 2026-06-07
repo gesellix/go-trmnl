@@ -1,15 +1,47 @@
 {{define "content"}}
 <h1>Calendar accounts</h1>
 
+<h2>Google OAuth clients</h2>
+<p class="muted">Create an OAuth client in your
+<a href="https://console.cloud.google.com/">Google Cloud project</a> (Calendar
+API enabled, type "Web application") and register this redirect URI:
+<code>{{.RedirectURI}}</code>. You can add more than one client (e.g. one per
+project).</p>
+
+{{if .OAuthClients}}
+<table class="list">
+  <thead><tr><th>Name</th><th>Client ID</th><th></th></tr></thead>
+  <tbody>
+  {{range .OAuthClients}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td><span class="muted">{{.ClientID}}</span></td>
+      <td><form method="post" action="/admin/calendar/oauth-clients/{{.ID}}/delete" class="inline" onsubmit="return confirm('Delete this OAuth client?')"><button type="submit" class="danger">Delete</button></form></td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+
+<form method="post" action="/admin/calendar/oauth-clients">
+  <label>Name <input type="text" name="name" placeholder="e.g. Family GCP project"></label>
+  <label>Client ID <input type="text" name="client_id" autocomplete="off"></label>
+  <label>Client secret <input type="password" name="client_secret" autocomplete="off"></label>
+  <button type="submit">Add OAuth client</button>
+</form>
+
 <h2>Add account</h2>
-{{if .GoogleConfigured}}
+{{if .OAuthClients}}
 <form method="get" action="/admin/calendar/google/start" class="inline">
+  <label>Google account via
+    <select name="client">
+      {{range .OAuthClients}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+    </select>
+  </label>
   <button type="submit">Add Google account</button>
 </form>
 {{else}}
-<p class="muted">Google integration is not configured. Set <code>TRMNL_GOOGLE_CLIENT_ID</code>
-and <code>TRMNL_GOOGLE_CLIENT_SECRET</code>, and register the redirect URI
-<code>{{.BaseURL}}/admin/oauth/google/callback</code> in your Google Cloud OAuth client.</p>
+<p class="muted">Add a Google OAuth client above to connect Google accounts.</p>
 {{end}}
 
 <form method="post" action="/admin/calendar/caldav">

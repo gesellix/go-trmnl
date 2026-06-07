@@ -3,6 +3,7 @@ package calendar
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/gesellix/go-trmnl/internal/secret"
@@ -21,23 +22,94 @@ const (
 // store cache and serving a merged agenda to the plugin. It is safe for the
 // background sync goroutine and request handlers to share one instance.
 type Service struct {
-	store *store.Store
-	oauth *GoogleOAuth
-	box   *secret.Box // encrypts sensitive config fields at rest (may be disabled)
+	store   *store.Store
+	box     *secret.Box // encrypts sensitive config fields at rest (may be disabled)
+	baseURL string      // public base URL, used to build the OAuth redirect URI
 
 	// newSource builds the provider source for an account. Overridable in tests.
 	newSource func(acc Account, deps sourceDeps) (Source, error)
 }
 
-// NewService builds the calendar service. oauth may be unconfigured; Google
-// operations then fail with a clear error until credentials are set. box
-// encrypts stored tokens; a nil box stores them as plaintext.
-func NewService(st *store.Store, oauth *GoogleOAuth, box *secret.Box) *Service {
-	return &Service{store: st, oauth: oauth, box: box, newSource: sourceFor}
+// NewService builds the calendar service. box encrypts stored credentials (a
+// nil box stores them as plaintext); baseURL is the server's public URL, used
+// for the Google OAuth redirect URI.
+func NewService(st *store.Store, box *secret.Box, baseURL string) *Service {
+	return &Service{store: st, box: box, baseURL: baseURL, newSource: sourceFor}
 }
 
-// OAuth exposes the Google OAuth client for the admin consent flow.
-func (s *Service) OAuth() *GoogleOAuth { return s.oauth }
+// --- Google OAuth clients ---
+
+// redirectURL is the OAuth callback registered in each Google client.
+func (s *Service) redirectURL() string { return s.baseURL + "/admin/oauth/google/callback" }
+
+// ListOAuthClients returns the configured OAuth clients (secrets stay encrypted
+// in the rows and are not needed by callers that only list/label them).
+func (s *Service) ListOAuthClients() ([]*store.OAuthClient, error) {
+	return s.store.ListOAuthClients()
+}
+
+// HasGoogleClients reports whether at least one Google OAuth client exists.
+func (s *Service) HasGoogleClients() bool {
+	clients, err := s.store.ListOAuthClients()
+	return err == nil && len(clients) > 0
+}
+
+// CreateOAuthClient stores a Google OAuth client, encrypting its secret.
+func (s *Service) CreateOAuthClient(name, clientID, clientSecret string) (int64, error) {
+	enc, err := s.box.Encrypt(clientSecret)
+	if err != nil {
+		return 0, err
+	}
+	c, err := s.store.CreateOAuthClient(string(ProviderGoogle), name, clientID, enc)
+	if err != nil {
+		return 0, err
+	}
+	return c.ID, nil
+}
+
+// DeleteOAuthClient removes an OAuth client.
+func (s *Service) DeleteOAuthClient(id int64) error { return s.store.DeleteOAuthClient(id) }
+
+// oauthForClient builds a GoogleOAuth for the given client row, decrypting its
+// secret.
+func (s *Service) oauthForClient(id int64) (*GoogleOAuth, error) {
+	c, err := s.store.GetOAuthClient(id)
+	if err != nil {
+		return nil, fmt.Errorf("calendar: oauth client %d: %w", id, err)
+	}
+	secret, err := s.box.Decrypt(c.ClientSecret)
+	if err != nil {
+		return nil, err
+	}
+	return NewGoogleOAuth(c.ClientID, secret, s.redirectURL()), nil
+}
+
+// GoogleAuthCodeURL returns the consent URL for a specific OAuth client.
+func (s *Service) GoogleAuthCodeURL(clientID int64, state string) (string, error) {
+	oauth, err := s.oauthForClient(clientID)
+	if err != nil {
+		return "", err
+	}
+	return oauth.AuthCodeURL(state), nil
+}
+
+// ExchangeGoogle swaps an auth code for a token using a specific client and
+// returns the token and the account email.
+func (s *Service) ExchangeGoogle(ctx context.Context, clientID int64, code string) (*oauth2.Token, string, error) {
+	oauth, err := s.oauthForClient(clientID)
+	if err != nil {
+		return nil, "", err
+	}
+	tok, err := oauth.Exchange(ctx, code)
+	if err != nil {
+		return nil, "", err
+	}
+	email, _, err := oauth.AccountInfo(ctx, tok)
+	if err != nil {
+		return nil, "", err
+	}
+	return tok, email, nil
+}
 
 // Accounts returns all configured accounts as domain values.
 func (s *Service) Accounts() ([]Account, error) {
@@ -123,7 +195,7 @@ func (s *Service) DeleteAccount(id int64) error { return s.store.DeleteCalendarA
 
 func (s *Service) deps() sourceDeps {
 	return sourceDeps{
-		oauth: s.oauth,
+		googleOAuthFor: s.oauthForClient,
 		onGoogleToken: func(id int64, cfg GoogleConfig) error {
 			j, err := s.marshalGoogleConfig(cfg)
 			if err != nil {
@@ -274,15 +346,17 @@ func (s *Service) NextWake() time.Duration {
 
 // --- Google account management (used by the admin OAuth flow) ---
 
-// CreateGoogleAccount stores a newly authorized Google account.
-func (s *Service) CreateGoogleAccount(name, marker string, tok *oauth2.Token, email string, calendarIDs []string, refresh time.Duration) (int64, error) {
+// CreateGoogleAccount stores a newly authorized Google account, bound to the
+// OAuth client it was authorized against.
+func (s *Service) CreateGoogleAccount(oauthClientID int64, name, marker string, tok *oauth2.Token, email string, calendarIDs []string, refresh time.Duration) (int64, error) {
 	cfg := GoogleConfig{
-		Email:        email,
-		RefreshToken: tok.RefreshToken,
-		AccessToken:  tok.AccessToken,
-		TokenType:    tok.TokenType,
-		Expiry:       tok.Expiry,
-		CalendarIDs:  calendarIDs,
+		OAuthClientID: oauthClientID,
+		Email:         email,
+		RefreshToken:  tok.RefreshToken,
+		AccessToken:   tok.AccessToken,
+		TokenType:     tok.TokenType,
+		Expiry:        tok.Expiry,
+		CalendarIDs:   calendarIDs,
 	}
 	j, err := s.marshalGoogleConfig(cfg)
 	if err != nil {
@@ -321,7 +395,11 @@ func (s *Service) ListGoogleCalendars(ctx context.Context, id int64) ([]Choice, 
 	if err != nil {
 		return nil, err
 	}
-	_, choices, err := s.oauth.AccountInfo(ctx, configToToken(acc.Config))
+	oauth, err := s.oauthForClient(acc.Config.OAuthClientID)
+	if err != nil {
+		return nil, err
+	}
+	_, choices, err := oauth.AccountInfo(ctx, configToToken(acc.Config))
 	return choices, err
 }
 

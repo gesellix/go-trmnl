@@ -48,7 +48,9 @@ type CalDAVConfig struct {
 // GoogleConfig is the provider config stored as JSON in the account row for a
 // Google account.
 type GoogleConfig struct {
-	Email string `json:"email"`
+	// OAuthClientID is the oauth_clients row this account authorized against.
+	OAuthClientID int64  `json:"oauth_client_id"`
+	Email         string `json:"email"`
 	// RefreshToken (and the cached AccessToken/Expiry) authorize Calendar API
 	// calls. The token is refreshed transparently and persisted back.
 	RefreshToken string    `json:"refresh_token"`

@@ -26,7 +26,11 @@ func (s *googleSource) service(ctx context.Context) (*gcal.Service, oauth2.Token
 	if s.svcFn != nil {
 		return s.svcFn(ctx)
 	}
-	ts := s.deps.oauth.cfg.TokenSource(ctx, configToToken(s.acc.Config))
+	oauth, err := s.deps.googleOAuthFor(s.acc.Config.OAuthClientID)
+	if err != nil {
+		return nil, nil, err
+	}
+	ts := oauth.cfg.TokenSource(ctx, configToToken(s.acc.Config))
 	svc, err := gcal.NewService(ctx, option.WithTokenSource(ts))
 	return svc, ts, err
 }
