@@ -51,17 +51,27 @@ clients are supported (e.g. one per Google Cloud project).
 
 ### 1. Create an OAuth client
 
+Google recently moved these settings into the **Google Auth Platform** section;
+the classic **APIs & Services** paths are noted in parentheses where they differ.
+
 1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create
    (or pick) a project.
 2. **APIs & Services → Library →** enable the **Google Calendar API**.
-3. **APIs & Services → OAuth consent screen:**
-   - User type **External** (personal Gmail accounts) is fine.
+3. Configure the consent screen under **Google Auth Platform → Branding** and
+   **→ Audience** (classic: **APIs & Services → OAuth consent screen**):
+   - **Audience / User type: External** is fine for personal Gmail.
    - Fill in the app name and your contact email.
-   - Add the scope `.../auth/calendar.readonly` (read-only calendar access).
-   - Add each family member's Google address under **Test users** (an app in
-     "Testing" mode is limited to listed test users, which is exactly what a
-     family server wants; you do not need to publish or get verified).
-4. **APIs & Services → Credentials → Create credentials → OAuth client ID:**
+   - Under **Audience → Test users**, add each family member's Google address. A
+     "Testing" app is limited to listed test users, which is exactly what a
+     family server wants; you do not need to publish or get verified.
+4. Add the read-only scope under **Google Auth Platform → Data access → Add or
+   remove scopes** (classic: the **Scopes** step of the consent screen): search
+   the Google Calendar API and select `.../auth/calendar.readonly`. (go-trmnl
+   also requests this scope at sign-in, so test users are prompted for it
+   regardless.)
+5. Create the client under **Google Auth Platform → Clients → Create client**
+   (classic: **APIs & Services → Credentials → Create credentials → OAuth client
+   ID**):
    - Application type **Web application**.
    - Under **Authorized redirect URIs**, add exactly:
 
@@ -73,7 +83,7 @@ clients are supported (e.g. one per Google Cloud project).
      `TRMNL_BASE_URL` value), e.g.
      `http://192.168.1.10:8080/admin/oauth/google/callback`. It must match
      character-for-character, including the scheme and port.
-5. Copy the generated **Client ID** and **Client secret**.
+6. Copy the generated **Client ID** and **Client secret**.
 
 ### 2. Add the OAuth client in go-trmnl
 
