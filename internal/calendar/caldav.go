@@ -50,6 +50,38 @@ func (s *caldavSource) discoverCalendars(ctx context.Context, c *caldav.Client) 
 	return cals, nil
 }
 
+// eventProps are the VEVENT properties we request. iCloud ignores <C:allprop>
+// and <C:allcomp> (it returns an empty component), so we must list properties
+// explicitly. Keep this in sync with what mapICalEvent reads.
+var eventProps = []string{
+	"UID", "SUMMARY", "DTSTART", "DTEND", "DURATION",
+	"LOCATION", "STATUS", "RRULE", "RECURRENCE-ID",
+}
+
+// buildCalendarQuery builds a calendar-query REPORT for VEVENTs overlapping w,
+// requesting the explicit property set. We do not use server-side <C:expand>:
+// iCloud returns empty data for it, so recurring events come back as their
+// master component (recurrence expansion is a follow-up; see ROADMAP).
+func buildCalendarQuery(w Window) *caldav.CalendarQuery {
+	return &caldav.CalendarQuery{
+		CompRequest: caldav.CalendarCompRequest{
+			Name: "VCALENDAR",
+			Comps: []caldav.CalendarCompRequest{{
+				Name:  "VEVENT",
+				Props: eventProps,
+			}},
+		},
+		CompFilter: caldav.CompFilter{
+			Name: "VCALENDAR",
+			Comps: []caldav.CompFilter{{
+				Name:  "VEVENT",
+				Start: w.From,
+				End:   w.To,
+			}},
+		},
+	}
+}
+
 func (s *caldavSource) Fetch(ctx context.Context, w Window) ([]Event, error) {
 	c, err := s.client()
 	if err != nil {
@@ -75,26 +107,7 @@ func (s *caldavSource) Fetch(ctx context.Context, w Window) ([]Event, error) {
 		}
 	}
 
-	query := &caldav.CalendarQuery{
-		// Request the full calendar object (all properties and components) and
-		// expand recurrences server-side. Expand must be set on the top-level
-		// request (it maps to <C:expand> in <C:calendar-data>); AllProps/AllComps
-		// ensure events come back with SUMMARY/DTSTART/etc.
-		CompRequest: caldav.CalendarCompRequest{
-			Name:     "VCALENDAR",
-			AllProps: true,
-			AllComps: true,
-			Expand:   &caldav.CalendarExpandRequest{Start: w.From, End: w.To},
-		},
-		CompFilter: caldav.CompFilter{
-			Name: "VCALENDAR",
-			Comps: []caldav.CompFilter{{
-				Name:  "VEVENT",
-				Start: w.From,
-				End:   w.To,
-			}},
-		},
-	}
+	query := buildCalendarQuery(w)
 
 	var marker []string
 	if s.acc.Marker != "" {
