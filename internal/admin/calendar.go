@@ -31,6 +31,13 @@ func oauthRedirectURL(r *http.Request) string {
 	return scheme + "://" + r.Host + "/admin/oauth/google/callback"
 }
 
+// requestIsHTTPS reports whether the request reached us over TLS (directly or
+// via a terminating proxy). Used to mark cookies Secure only when it would not
+// break a plain-HTTP LAN deployment.
+func requestIsHTTPS(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
 // CalendarList shows configured calendar accounts and the "add account" action.
 func (h *Handler) CalendarList(w http.ResponseWriter, r *http.Request) {
 	if h.cal == nil {
@@ -146,6 +153,7 @@ func (h *Handler) CalendarGoogleStart(w http.ResponseWriter, r *http.Request) {
 		Value:    nonce + "|" + i64(clientID),
 		Path:     "/admin",
 		HttpOnly: true,
+		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   600,
 	})
@@ -165,7 +173,15 @@ func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid OAuth state", http.StatusBadRequest)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: oauthStateCookie, Value: "", Path: "/admin", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookie,
+		Value:    "",
+		Path:     "/admin",
+		HttpOnly: true,
+		Secure:   requestIsHTTPS(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
 
 	nonce, clientIDStr, ok := strings.Cut(c.Value, "|")
 	if !ok || nonce == "" || nonce != r.URL.Query().Get("state") {
@@ -388,9 +404,14 @@ func randomToken() string {
 	return hex.EncodeToString(b)
 }
 
-// parseHours parses a positive integer hour count, falling back to def.
+// maxRefreshHours bounds a refresh interval at one (leap) year, which also
+// keeps the value well within int range on 32-bit builds (e.g. arm).
+const maxRefreshHours = 24 * 366
+
+// parseHours parses a positive integer hour count, falling back to def. The
+// value is bounded so the int conversion is safe on 32-bit platforms.
 func parseHours(s string, def int) int {
-	if v, ok := parseInt64(s); ok && v > 0 {
+	if v, ok := parseInt64(s); ok && v >= 1 && v <= maxRefreshHours {
 		return int(v)
 	}
 	return def
