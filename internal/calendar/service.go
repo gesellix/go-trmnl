@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/gesellix/go-trmnl/internal/secret"
 	"github.com/gesellix/go-trmnl/internal/store"
 	"golang.org/x/oauth2"
 )
@@ -22,15 +23,17 @@ const (
 type Service struct {
 	store *store.Store
 	oauth *GoogleOAuth
+	box   *secret.Box // encrypts sensitive config fields at rest (may be disabled)
 
 	// newSource builds the provider source for an account. Overridable in tests.
 	newSource func(acc Account, deps sourceDeps) (Source, error)
 }
 
 // NewService builds the calendar service. oauth may be unconfigured; Google
-// operations then fail with a clear error until credentials are set.
-func NewService(st *store.Store, oauth *GoogleOAuth) *Service {
-	return &Service{store: st, oauth: oauth, newSource: sourceFor}
+// operations then fail with a clear error until credentials are set. box
+// encrypts stored tokens; a nil box stores them as plaintext.
+func NewService(st *store.Store, oauth *GoogleOAuth, box *secret.Box) *Service {
+	return &Service{store: st, oauth: oauth, box: box, newSource: sourceFor}
 }
 
 // OAuth exposes the Google OAuth client for the admin consent flow.
@@ -44,7 +47,7 @@ func (s *Service) Accounts() ([]Account, error) {
 	}
 	out := make([]Account, 0, len(rows))
 	for _, r := range rows {
-		acc, err := accountFromStore(r)
+		acc, err := s.loadAccount(r)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +62,40 @@ func (s *Service) Account(id int64) (Account, error) {
 	if err != nil {
 		return Account{}, err
 	}
-	return accountFromStore(r)
+	return s.loadAccount(r)
+}
+
+// loadAccount converts a store row to a domain Account, decrypting the stored
+// token fields.
+func (s *Service) loadAccount(r *store.CalendarAccount) (Account, error) {
+	acc, err := accountFromStore(r)
+	if err != nil {
+		return Account{}, err
+	}
+	if acc.Config.RefreshToken, err = s.box.Decrypt(acc.Config.RefreshToken); err != nil {
+		return Account{}, err
+	}
+	if acc.Config.AccessToken, err = s.box.Decrypt(acc.Config.AccessToken); err != nil {
+		return Account{}, err
+	}
+	return acc, nil
+}
+
+// marshalGoogleConfig encrypts the token fields and serializes the config for
+// storage.
+func (s *Service) marshalGoogleConfig(cfg GoogleConfig) (string, error) {
+	var err error
+	if cfg.RefreshToken, err = s.box.Encrypt(cfg.RefreshToken); err != nil {
+		return "", err
+	}
+	if cfg.AccessToken, err = s.box.Encrypt(cfg.AccessToken); err != nil {
+		return "", err
+	}
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 // DeleteAccount removes an account and its cached events.
@@ -69,11 +105,11 @@ func (s *Service) deps() sourceDeps {
 	return sourceDeps{
 		oauth: s.oauth,
 		onGoogleToken: func(id int64, cfg GoogleConfig) error {
-			b, err := json.Marshal(cfg)
+			j, err := s.marshalGoogleConfig(cfg)
 			if err != nil {
 				return err
 			}
-			return s.store.SetCalendarAccountConfig(id, string(b))
+			return s.store.SetCalendarAccountConfig(id, j)
 		},
 	}
 }
@@ -179,14 +215,16 @@ func (s *Service) Agenda(accountIDs []int64, w Window, max int) ([]Event, error)
 	return merged, nil
 }
 
+// markerByID maps account IDs to their marker badge. It reads store rows
+// directly (no token decryption) since rendering an agenda never needs tokens.
 func (s *Service) markerByID() (map[int64]string, error) {
-	accs, err := s.Accounts()
+	rows, err := s.store.ListCalendarAccounts()
 	if err != nil {
 		return nil, err
 	}
-	m := make(map[int64]string, len(accs))
-	for _, a := range accs {
-		m[a.ID] = a.Marker
+	m := make(map[int64]string, len(rows))
+	for _, r := range rows {
+		m[r.ID] = r.Marker
 	}
 	return m, nil
 }
@@ -226,14 +264,14 @@ func (s *Service) CreateGoogleAccount(name, marker string, tok *oauth2.Token, em
 		Expiry:       tok.Expiry,
 		CalendarIDs:  calendarIDs,
 	}
-	b, err := json.Marshal(cfg)
+	j, err := s.marshalGoogleConfig(cfg)
 	if err != nil {
 		return 0, err
 	}
 	if name == "" {
 		name = email
 	}
-	acc, err := s.store.CreateCalendarAccount(string(ProviderGoogle), name, marker, string(b), int(refresh/time.Second))
+	acc, err := s.store.CreateCalendarAccount(string(ProviderGoogle), name, marker, j, int(refresh/time.Second))
 	if err != nil {
 		return 0, err
 	}
@@ -249,11 +287,11 @@ func (s *Service) UpdateGoogleAccount(id int64, name, marker string, calendarIDs
 	}
 	cfg := acc.Config
 	cfg.CalendarIDs = calendarIDs
-	b, err := json.Marshal(cfg)
+	j, err := s.marshalGoogleConfig(cfg)
 	if err != nil {
 		return err
 	}
-	return s.store.UpdateCalendarAccount(id, name, marker, string(b), int(refresh/time.Second))
+	return s.store.UpdateCalendarAccount(id, name, marker, j, int(refresh/time.Second))
 }
 
 // ListGoogleCalendars lists the calendars available to an existing account,

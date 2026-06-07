@@ -3,10 +3,13 @@ package calendar
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gesellix/go-trmnl/internal/secret"
 	"github.com/gesellix/go-trmnl/internal/store"
+	"golang.org/x/oauth2"
 )
 
 type fakeSource struct {
@@ -39,7 +42,7 @@ func TestServiceSyncAndAgenda(t *testing.T) {
 	b, _ := st.CreateCalendarAccount(string(ProviderGoogle), "Dad", "B", `{"refresh_token":"r"}`, 0)
 
 	shared := Event{UID: "shared", Title: "Dinner", Start: at("2026-06-10T18:00:00Z"), End: at("2026-06-10T20:00:00Z")}
-	svc := NewService(st, NewGoogleOAuth("", "", ""))
+	svc := NewService(st, NewGoogleOAuth("", "", ""), nil)
 	svc.newSource = func(acc Account, _ sourceDeps) (Source, error) {
 		switch acc.Marker {
 		case "A":
@@ -93,9 +96,46 @@ func TestServiceSyncAndAgenda(t *testing.T) {
 	}
 }
 
+func TestServiceEncryptsTokenAtRest(t *testing.T) {
+	st := openStore(t)
+	svc := NewService(st, NewGoogleOAuth("", "", ""), secret.New("master-key"))
+
+	id, err := svc.CreateGoogleAccount("Mom", "M",
+		&oauth2.Token{RefreshToken: "secret-refresh", AccessToken: "secret-access"},
+		"mom@example.com", []string{"primary"}, 12*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The raw stored config must not contain the plaintext token, but should
+	// keep non-secret fields (email) readable.
+	row, _ := st.GetCalendarAccount(id)
+	if strings.Contains(row.ConfigJSON, "secret-refresh") || strings.Contains(row.ConfigJSON, "secret-access") {
+		t.Fatalf("token stored in plaintext: %s", row.ConfigJSON)
+	}
+	if !strings.Contains(row.ConfigJSON, "mom@example.com") {
+		t.Errorf("email should not be encrypted: %s", row.ConfigJSON)
+	}
+
+	// Reading through the service decrypts.
+	acc, err := svc.Account(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acc.Config.RefreshToken != "secret-refresh" || acc.Config.AccessToken != "secret-access" {
+		t.Errorf("decrypted token mismatch: %+v", acc.Config)
+	}
+
+	// A service without the key cannot read the encrypted token.
+	noKey := NewService(st, NewGoogleOAuth("", "", ""), secret.New(""))
+	if _, err := noKey.Account(id); err == nil {
+		t.Error("expected an error reading an encrypted token without the key")
+	}
+}
+
 func TestNextWakeClamps(t *testing.T) {
 	st := openStore(t)
-	svc := NewService(st, NewGoogleOAuth("", "", ""))
+	svc := NewService(st, NewGoogleOAuth("", "", ""), nil)
 
 	// No accounts -> default 15m.
 	if got := svc.NextWake(); got != 15*time.Minute {
