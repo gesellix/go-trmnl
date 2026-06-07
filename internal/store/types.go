@@ -65,6 +65,7 @@ type Screen struct {
 	PluginID     int64
 	Name         string
 	SettingsJSON string
+	DitherMode   sql.NullString // NULL == inherit the global dither_mode setting
 	RenderedHash sql.NullString
 	RenderedAt   sql.NullInt64
 	CreatedAt    int64
