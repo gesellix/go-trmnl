@@ -45,39 +45,93 @@ func (p *Plugin) Title() string { return "Weather" }
 // DefaultRefresh returns the cache TTL hint for rendered weather screens.
 func (p *Plugin) DefaultRefresh() time.Duration { return 30 * time.Minute }
 
-// settings configures the weather screen.
+// settings configures the weather screen. units is kept for backward
+// compatibility; the finer-grained *_unit fields override it when set.
 type settings struct {
-	Location  string  `json:"location"`  // optional city name, geocoded if lat/lon unset
-	Latitude  float64 `json:"latitude"`  // preferred if non-zero
-	Longitude float64 `json:"longitude"` //
-	Units     string  `json:"units"`     // "metric" (default) or "imperial"
-	Label     string  `json:"label"`     // shown in the corner
+	Location        string  `json:"location"`         // optional city name, geocoded if lat/lon unset
+	Latitude        float64 `json:"latitude"`         // preferred if non-zero
+	Longitude       float64 `json:"longitude"`        //
+	Units           string  `json:"units"`            // "metric" (default) or "imperial"
+	TempUnit        string  `json:"temp_unit"`        // "c" or "f"
+	WindUnit        string  `json:"wind_unit"`        // "kmh", "mph", "ms", "kn"
+	PrecipUnit      string  `json:"precip_unit"`      // "mm" or "inch"
+	ForecastHeading string  `json:"forecast_heading"` // "relative" (Today/Tomorrow) or "date"
+	Label           string  `json:"label"`            // shown in the corner
 }
 
 func (s settings) imperial() bool { return s.Units == "imperial" }
+
+// resolveUnits returns the Open-Meteo API unit tokens and their display labels.
+func (s settings) resolveUnits() (apiTemp, apiWind, apiPrecip, dispTemp, dispWind string) {
+	// Temperature.
+	switch s.TempUnit {
+	case "f":
+		apiTemp, dispTemp = "fahrenheit", "F"
+	case "c":
+		apiTemp, dispTemp = "celsius", "C"
+	default:
+		if s.imperial() {
+			apiTemp, dispTemp = "fahrenheit", "F"
+		} else {
+			apiTemp, dispTemp = "celsius", "C"
+		}
+	}
+	// Wind.
+	apiWind = s.WindUnit
+	if apiWind == "" {
+		if s.imperial() {
+			apiWind = "mph"
+		} else {
+			apiWind = "kmh"
+		}
+	}
+	dispWind = map[string]string{"kmh": "km/h", "mph": "mph", "ms": "m/s", "kn": "kn"}[apiWind]
+	if dispWind == "" {
+		apiWind, dispWind = "kmh", "km/h"
+	}
+	// Precipitation.
+	apiPrecip = s.PrecipUnit
+	if apiPrecip == "" {
+		if s.imperial() {
+			apiPrecip = "inch"
+		} else {
+			apiPrecip = "mm"
+		}
+	}
+	if apiPrecip != "inch" {
+		apiPrecip = "mm"
+	}
+	return apiTemp, apiWind, apiPrecip, dispTemp, dispWind
+}
 
 // Data is the rendered model. Exported so Render can be golden-tested with a
 // hand-built value (no network).
 type Data struct {
 	Place    string
 	TempUnit string // "C" or "F"
-	WindUnit string // "km/h" or "mph"
+	WindUnit string // "km/h", "mph", ...
 	Label    string
 
-	Temp     float64
-	Code     int
-	Humidity int
-	Wind     float64
+	Temp      float64
+	FeelsLike float64
+	Code      int
+	CondLabel string // e.g. "Partly cloudy"
+	Humidity  int
+	Wind      float64
+	Sunrise   string // "05:20"
+	Sunset    string // "21:40"
 
 	Days []DayForecast
 }
 
 // DayForecast is one day in the forecast strip.
 type DayForecast struct {
-	Name string
-	Code int
-	Hi   float64
-	Lo   float64
+	Heading   string // "Today"/"Tomorrow" or "Jun 8"
+	Code      int
+	Hi        float64
+	Lo        float64
+	UV        int
+	PrecipPct int
 }
 
 // DataModel fetches current conditions and the forecast from Open-Meteo.
@@ -105,44 +159,65 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 		place = fmt.Sprintf("%.2f, %.2f", lat, lon)
 	}
 
-	tempUnit, windUnit := "celsius", "kmh"
-	tu, wu := "C", "km/h"
-	if s.imperial() {
-		tempUnit, windUnit = "fahrenheit", "mph"
-		tu, wu = "F", "mph"
-	}
-
-	fc, err := p.fetchForecast(ctx, lat, lon, tempUnit, windUnit)
+	apiTemp, apiWind, apiPrecip, dispTemp, dispWind := s.resolveUnits()
+	fc, err := p.fetchForecast(ctx, lat, lon, apiTemp, apiWind, apiPrecip)
 	if err != nil {
 		return nil, err
 	}
 
+	_, cond := codeInfo(fc.Current.WeatherCode)
 	d := Data{
-		Place:    place,
-		TempUnit: tu,
-		WindUnit: wu,
-		Label:    s.Label,
-		Temp:     fc.Current.Temperature,
-		Code:     fc.Current.WeatherCode,
-		Humidity: fc.Current.Humidity,
-		Wind:     fc.Current.WindSpeed,
+		Place:     place,
+		TempUnit:  dispTemp,
+		WindUnit:  dispWind,
+		Label:     s.Label,
+		Temp:      fc.Current.Temperature,
+		FeelsLike: fc.Current.Apparent,
+		Code:      fc.Current.WeatherCode,
+		CondLabel: cond,
+		Humidity:  fc.Current.Humidity,
+		Wind:      fc.Current.WindSpeed,
+		Sunrise:   hhmm(at(fc.Daily.Sunrise, 0)),
+		Sunset:    hhmm(at(fc.Daily.Sunset, 0)),
 	}
 	for i := range fc.Daily.Time {
-		if i >= 4 {
+		if i >= 2 {
 			break
 		}
-		name := "Today"
-		if t, err := time.Parse("2006-01-02", fc.Daily.Time[i]); err == nil && i > 0 {
-			name = t.Format("Mon")
-		}
 		d.Days = append(d.Days, DayForecast{
-			Name: name,
-			Code: at(fc.Daily.WeatherCode, i),
-			Hi:   atF(fc.Daily.TempMax, i),
-			Lo:   atF(fc.Daily.TempMin, i),
+			Heading:   heading(s.ForecastHeading, fc.Daily.Time[i], i),
+			Code:      atI(fc.Daily.WeatherCode, i),
+			Hi:        atF(fc.Daily.TempMax, i),
+			Lo:        atF(fc.Daily.TempMin, i),
+			UV:        int(atF(fc.Daily.UVMax, i) + 0.5),
+			PrecipPct: atI(fc.Daily.PrecipProb, i),
 		})
 	}
 	return d, nil
+}
+
+// heading returns the forecast row heading for day i.
+func heading(mode, isoDate string, i int) string {
+	if mode == "date" {
+		if t, err := time.Parse("2006-01-02", isoDate); err == nil {
+			return t.Format("Jan 2")
+		}
+	}
+	if i == 0 {
+		return "Today"
+	}
+	return "Tomorrow"
+}
+
+// hhmm parses an Open-Meteo local timestamp ("2006-01-02T15:04") to "15:04".
+func hhmm(s string) string {
+	if s == "" {
+		return ""
+	}
+	if t, err := time.Parse("2006-01-02T15:04", s); err == nil {
+		return t.Format("15:04")
+	}
+	return s
 }
 
 // --- Open-Meteo API ---
@@ -150,6 +225,7 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 type forecastResp struct {
 	Current struct {
 		Temperature float64 `json:"temperature_2m"`
+		Apparent    float64 `json:"apparent_temperature"`
 		Humidity    int     `json:"relative_humidity_2m"`
 		WindSpeed   float64 `json:"wind_speed_10m"`
 		WeatherCode int     `json:"weather_code"`
@@ -159,19 +235,24 @@ type forecastResp struct {
 		WeatherCode []int     `json:"weather_code"`
 		TempMax     []float64 `json:"temperature_2m_max"`
 		TempMin     []float64 `json:"temperature_2m_min"`
+		Sunrise     []string  `json:"sunrise"`
+		Sunset      []string  `json:"sunset"`
+		UVMax       []float64 `json:"uv_index_max"`
+		PrecipProb  []int     `json:"precipitation_probability_max"`
 	} `json:"daily"`
 }
 
-func (p *Plugin) fetchForecast(ctx context.Context, lat, lon float64, tempUnit, windUnit string) (*forecastResp, error) {
+func (p *Plugin) fetchForecast(ctx context.Context, lat, lon float64, tempUnit, windUnit, precipUnit string) (*forecastResp, error) {
 	q := url.Values{}
 	q.Set("latitude", strconv.FormatFloat(lat, 'f', 4, 64))
 	q.Set("longitude", strconv.FormatFloat(lon, 'f', 4, 64))
-	q.Set("current", "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m")
-	q.Set("daily", "weather_code,temperature_2m_max,temperature_2m_min")
+	q.Set("current", "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m")
+	q.Set("daily", "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max")
 	q.Set("timezone", "auto")
-	q.Set("forecast_days", "4")
+	q.Set("forecast_days", "2")
 	q.Set("temperature_unit", tempUnit)
 	q.Set("wind_speed_unit", windUnit)
+	q.Set("precipitation_unit", precipUnit)
 
 	var out forecastResp
 	if err := p.getJSON(ctx, p.forecastBase+"?"+q.Encode(), &out); err != nil {
@@ -237,13 +318,20 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	dc.Clear()
 	dc.SetRGB(0, 0, 0)
 
-	drawCurrent(dc, d)
-	drawForecast(dc, d)
+	drawCurrent(dc, d, in.Width)
+	drawForecast(dc, d, in.Width, in.Height)
 	drawLabel(dc, d, in.Width, in.Height)
 	return img, nil
 }
 
-func at(s []int, i int) int {
+func at(s []string, i int) string {
+	if i < len(s) {
+		return s[i]
+	}
+	return ""
+}
+
+func atI(s []int, i int) int {
 	if i < len(s) {
 		return s[i]
 	}

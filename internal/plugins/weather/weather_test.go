@@ -40,11 +40,15 @@ func mockServer(t *testing.T) *httptest.Server {
 	})
 	mux.HandleFunc("/v1/forecast", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{
-			"current":{"temperature_2m":18.3,"relative_humidity_2m":72,"wind_speed_10m":14.0,"weather_code":61},
-			"daily":{"time":["2026-06-06","2026-06-07","2026-06-08","2026-06-09"],
-				"weather_code":[61,2,0,95],
-				"temperature_2m_max":[21,17,24,19],
-				"temperature_2m_min":[12,9,13,11]}
+			"current":{"temperature_2m":18.3,"apparent_temperature":17.1,"relative_humidity_2m":72,"wind_speed_10m":14.0,"weather_code":61},
+			"daily":{"time":["2026-06-06","2026-06-07"],
+				"weather_code":[61,2],
+				"temperature_2m_max":[21,17],
+				"temperature_2m_min":[12,9],
+				"sunrise":["2026-06-06T05:20","2026-06-07T05:21"],
+				"sunset":["2026-06-06T21:40","2026-06-07T21:41"],
+				"uv_index_max":[5.4,2.1],
+				"precipitation_probability_max":[0,40]}
 		}`))
 	})
 	ts := httptest.NewServer(mux)
@@ -69,17 +73,47 @@ func TestDataModelWithCoordinates(t *testing.T) {
 		t.Fatalf("DataModel: %v", err)
 	}
 	d := raw.(Data)
-	if d.Temp != 18.3 || d.Humidity != 72 || d.Code != 61 {
+	if d.Temp != 18.3 || d.FeelsLike != 17.1 || d.Humidity != 72 || d.Code != 61 {
 		t.Errorf("unexpected current: %+v", d)
 	}
 	if d.TempUnit != "C" || d.WindUnit != "km/h" {
 		t.Errorf("units = %q/%q, want C/km/h", d.TempUnit, d.WindUnit)
 	}
-	if len(d.Days) != 4 || d.Days[0].Name != "Today" || d.Days[1].Name != "Sun" {
-		t.Errorf("forecast days wrong: %+v", d.Days)
+	if d.Sunrise != "05:20" || d.Sunset != "21:40" {
+		t.Errorf("sun times = %q/%q, want 05:20/21:40", d.Sunrise, d.Sunset)
 	}
-	if d.Days[2].Hi != 24 {
-		t.Errorf("day 2 hi = %v, want 24", d.Days[2].Hi)
+	if len(d.Days) != 2 || d.Days[0].Heading != "Today" || d.Days[1].Heading != "Tomorrow" {
+		t.Errorf("forecast headings wrong: %+v", d.Days)
+	}
+	if d.Days[0].UV != 5 || d.Days[1].PrecipPct != 40 || d.Days[1].Hi != 17 {
+		t.Errorf("forecast values wrong: %+v", d.Days)
+	}
+}
+
+func TestForecastHeadingDate(t *testing.T) {
+	p := newMockPlugin(t)
+	in := plugins.RenderInput{Settings: []byte(`{"latitude":52.52,"longitude":13.41,"forecast_heading":"date"}`)}
+	raw, err := p.DataModel(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := raw.(Data)
+	if d.Days[0].Heading != "Jun 6" {
+		t.Errorf("date heading = %q, want Jun 6", d.Days[0].Heading)
+	}
+}
+
+func TestUnitOverrides(t *testing.T) {
+	s := settings{Units: "metric", TempUnit: "f", WindUnit: "mph", PrecipUnit: "inch"}
+	apiTemp, apiWind, apiPrecip, dispTemp, dispWind := s.resolveUnits()
+	if apiTemp != "fahrenheit" || dispTemp != "F" {
+		t.Errorf("temp override ignored: %s/%s", apiTemp, dispTemp)
+	}
+	if apiWind != "mph" || dispWind != "mph" {
+		t.Errorf("wind override ignored: %s/%s", apiWind, dispWind)
+	}
+	if apiPrecip != "inch" {
+		t.Errorf("precip override ignored: %s", apiPrecip)
 	}
 }
 
@@ -109,8 +143,12 @@ func TestDataModelRequiresLocation(t *testing.T) {
 
 func TestRenderProducesPanel(t *testing.T) {
 	p := New()
-	d := Data{Place: "Berlin", TempUnit: "C", WindUnit: "km/h", Temp: 18, Code: 61, Humidity: 72, Wind: 14,
-		Days: []DayForecast{{"Today", 2, 21, 12}, {"Sun", 61, 17, 9}}}
+	d := Data{Place: "Berlin", TempUnit: "C", WindUnit: "km/h", Temp: 18, FeelsLike: 17, Code: 61,
+		CondLabel: "Rain", Humidity: 72, Wind: 14, Sunrise: "05:20", Sunset: "21:40",
+		Days: []DayForecast{
+			{Heading: "Today", Code: 2, Hi: 21, Lo: 12, UV: 5, PrecipPct: 10},
+			{Heading: "Tomorrow", Code: 61, Hi: 17, Lo: 9, UV: 2, PrecipPct: 40},
+		}}
 	img, err := p.Render(context.Background(), plugins.RenderInput{Width: 800, Height: 480}, d)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
