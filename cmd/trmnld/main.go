@@ -68,16 +68,14 @@ func run() error {
 		log.Printf("WARNING: seed example content: %v", seedErr)
 	}
 
-	// Family calendar: shared account store + provider sync. The OAuth redirect
-	// URI must match the one registered in the Google Cloud OAuth client.
-	googleOAuth := calendar.NewGoogleOAuth(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.PublicBaseURL+"/admin/oauth/google/callback")
-	secretBox := secret.NewFromEnv()
-	cal := calendar.NewService(st, googleOAuth, secretBox)
+	// Family calendar: shared account/OAuth-client store + provider sync. OAuth
+	// clients are configured in the admin UI; the redirect URI is built from the
+	// public base URL.
+	secretBox := secret.New(cfg.SecretKey)
+	cal := calendar.NewService(st, secretBox, cfg.PublicBaseURL)
 	plugins.Register(familycalendar.New(cal))
-	if !googleOAuth.Configured() {
-		log.Printf("note: family calendar Google integration disabled (set TRMNL_GOOGLE_CLIENT_ID/SECRET to enable)")
-	} else if !secretBox.Enabled() {
-		log.Printf("note: calendar OAuth tokens are stored unencrypted (set TRMNL_SECRET_KEY to enable encryption at rest)")
+	if !secretBox.Enabled() {
+		log.Printf("note: calendar credentials are stored unencrypted (set -secret-key/TRMNL_SECRET_KEY to enable encryption at rest)")
 	}
 
 	r := server.New()
@@ -103,9 +101,7 @@ func run() error {
 	if cfg.CleanupInterval > 0 || cfg.LogRetention > 0 {
 		go runMaintenance(ctx, st, cfg.UploadsDir, cfg.CleanupInterval, cfg.LogRetention)
 	}
-	if googleOAuth.Configured() {
-		go runCalendarSync(ctx, cal)
-	}
+	go runCalendarSync(ctx, cal)
 
 	log.Printf("trmnld %s listening on %s (public base URL %s)", version, cfg.ListenAddr, cfg.PublicBaseURL)
 	return server.Run(ctx, cfg.ListenAddr, r)

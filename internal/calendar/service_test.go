@@ -42,7 +42,7 @@ func TestServiceSyncAndAgenda(t *testing.T) {
 	b, _ := st.CreateCalendarAccount(string(ProviderGoogle), "Dad", "B", `{"refresh_token":"r"}`, 0)
 
 	shared := Event{UID: "shared", Title: "Dinner", Start: at("2026-06-10T18:00:00Z"), End: at("2026-06-10T20:00:00Z")}
-	svc := NewService(st, NewGoogleOAuth("", "", ""), nil)
+	svc := NewService(st, nil, "")
 	svc.newSource = func(acc Account, _ sourceDeps) (Source, error) {
 		switch acc.Marker {
 		case "A":
@@ -98,9 +98,9 @@ func TestServiceSyncAndAgenda(t *testing.T) {
 
 func TestServiceEncryptsTokenAtRest(t *testing.T) {
 	st := openStore(t)
-	svc := NewService(st, NewGoogleOAuth("", "", ""), secret.New("master-key"))
+	svc := NewService(st, secret.New("master-key"), "")
 
-	id, err := svc.CreateGoogleAccount("Mom", "M",
+	id, err := svc.CreateGoogleAccount(0, "Mom", "M",
 		&oauth2.Token{RefreshToken: "secret-refresh", AccessToken: "secret-access"},
 		"mom@example.com", []string{"primary"}, 12*time.Hour)
 	if err != nil {
@@ -127,7 +127,7 @@ func TestServiceEncryptsTokenAtRest(t *testing.T) {
 	}
 
 	// A service without the key cannot read the encrypted token.
-	noKey := NewService(st, NewGoogleOAuth("", "", ""), secret.New(""))
+	noKey := NewService(st, secret.New(""), "")
 	if _, err := noKey.Account(id); err == nil {
 		t.Error("expected an error reading an encrypted token without the key")
 	}
@@ -135,7 +135,7 @@ func TestServiceEncryptsTokenAtRest(t *testing.T) {
 
 func TestNextWakeClamps(t *testing.T) {
 	st := openStore(t)
-	svc := NewService(st, NewGoogleOAuth("", "", ""), nil)
+	svc := NewService(st, nil, "")
 
 	// No accounts -> default 15m.
 	if got := svc.NextWake(); got != 15*time.Minute {

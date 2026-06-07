@@ -110,6 +110,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/settings", h.SettingsSave)
 
 		r.Get("/calendar", h.CalendarList)
+		r.Post("/calendar/oauth-clients", h.CalendarOAuthClientCreate)
+		r.Post("/calendar/oauth-clients/{id}/delete", h.CalendarOAuthClientDelete)
 		r.Get("/calendar/google/start", h.CalendarGoogleStart)
 		r.Get("/oauth/google/callback", h.CalendarGoogleCallback)
 		r.Post("/calendar/caldav", h.CalendarCalDAVCreate)

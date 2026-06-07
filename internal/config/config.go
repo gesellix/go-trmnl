@@ -39,11 +39,9 @@ type Config struct {
 	// LogRetention is how long device log entries are kept before pruning.
 	// Zero disables log pruning.
 	LogRetention time.Duration
-	// GoogleClientID and GoogleClientSecret are the OAuth client credentials for
-	// the family calendar plugin's Google integration. Empty disables it. The
-	// OAuth redirect URI is <PublicBaseURL>/admin/oauth/google/callback.
-	GoogleClientID     string
-	GoogleClientSecret string
+	// SecretKey encrypts sensitive calendar credentials at rest (OAuth client
+	// secrets and tokens, CalDAV passwords). Empty stores them as plaintext.
+	SecretKey string
 }
 
 // Load parses configuration from the given args (typically os.Args[1:]),
@@ -60,8 +58,7 @@ func Load(args []string) (*Config, error) {
 	adminPass := fs.String("admin-password", env("TRMNL_ADMIN_PASSWORD", ""), "Admin UI password (empty disables auth)")
 	cleanup := fs.String("cleanup-interval", env("TRMNL_CLEANUP_INTERVAL", "1h"), "How often to prune the rendered-image cache (e.g. 1h); 0 disables")
 	logRetention := fs.String("log-retention", env("TRMNL_LOG_RETENTION", "32d"), "How long to keep device logs (e.g. 32d, 720h); 0 disables")
-	googleID := fs.String("google-client-id", env("TRMNL_GOOGLE_CLIENT_ID", ""), "Google OAuth client ID for the family calendar plugin")
-	googleSecret := fs.String("google-client-secret", env("TRMNL_GOOGLE_CLIENT_SECRET", ""), "Google OAuth client secret for the family calendar plugin")
+	secretKey := fs.String("secret-key", env("TRMNL_SECRET_KEY", ""), "Key to encrypt calendar credentials at rest (empty stores them as plaintext)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -77,17 +74,16 @@ func Load(args []string) (*Config, error) {
 	}
 
 	c := &Config{
-		ListenAddr:         *listen,
-		PublicBaseURL:      strings.TrimRight(*baseURL, "/"),
-		DataDir:            *dataDir,
-		DBPath:             *dbPath,
-		UploadsDir:         *uploads,
-		AdminUser:          *adminUser,
-		AdminPassword:      *adminPass,
-		CleanupInterval:    cleanupInterval,
-		LogRetention:       logRetentionDur,
-		GoogleClientID:     *googleID,
-		GoogleClientSecret: *googleSecret,
+		ListenAddr:      *listen,
+		PublicBaseURL:   strings.TrimRight(*baseURL, "/"),
+		DataDir:         *dataDir,
+		DBPath:          *dbPath,
+		UploadsDir:      *uploads,
+		AdminUser:       *adminUser,
+		AdminPassword:   *adminPass,
+		CleanupInterval: cleanupInterval,
+		LogRetention:    logRetentionDur,
+		SecretKey:       *secretKey,
 	}
 
 	if c.PublicBaseURL == "" {

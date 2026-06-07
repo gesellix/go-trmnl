@@ -48,6 +48,7 @@ func run() error {
 	width := flag.Int("width", render.Width, "image width")
 	height := flag.Int("height", render.Height, "image height")
 	dbPath := flag.String("db", "", "SQLite database path (enables the familycalendar plugin to read cached events)")
+	secretKey := flag.String("secret-key", os.Getenv("TRMNL_SECRET_KEY"), "key to decrypt calendar credentials at rest")
 	list := flag.Bool("list", false, "list available plugins and exit")
 	flag.Parse()
 
@@ -60,7 +61,7 @@ func run() error {
 			return fmt.Errorf("open db: %w", err)
 		}
 		defer func() { _ = st.Close() }()
-		calSvc = calendar.NewService(st, calendar.NewGoogleOAuth("", "", ""), secret.NewFromEnv())
+		calSvc = calendar.NewService(st, secret.New(*secretKey), "")
 	}
 	plugins.Register(familycalendar.New(calSvc))
 
