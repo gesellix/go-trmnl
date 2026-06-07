@@ -65,10 +65,11 @@ func (s *Service) CreateOAuthClient(name, clientID, clientSecret string) (int64,
 // DeleteOAuthClient removes an OAuth client.
 func (s *Service) DeleteOAuthClient(id int64) error { return s.store.DeleteOAuthClient(id) }
 
-// MigrateEncryption re-encrypts stored secrets to the current format: it
-// upgrades legacy (v1) ciphertext and encrypts any plaintext secrets, leaving
-// already-current values untouched. It is a no-op without a configured key.
-// Returns the number of rows rewritten.
+// MigrateEncryption encrypts any plaintext stored secrets to the current
+// format, leaving already-current values untouched. It is a no-op without a
+// configured key. (Pre-scrypt v1 values are no longer readable and are not
+// migrated; they surface as an error when used.) Returns the number of rows
+// rewritten.
 func (s *Service) MigrateEncryption() (int, error) {
 	if !s.box.Enabled() {
 		return 0, nil

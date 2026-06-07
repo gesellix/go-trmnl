@@ -23,25 +23,16 @@ func TestRoundTripV2(t *testing.T) {
 	}
 }
 
-func TestReadsLegacyV1(t *testing.T) {
-	const key = "master"
-	// Reproduce a v1 value (AES-GCM with a SHA-256-derived key).
-	v1, err := seal(aeadFromKey(sha256Key(key)), legacyPrefix, "legacy-secret")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(v1, legacyPrefix) {
-		t.Fatalf("not a v1 value: %q", v1)
-	}
-	got, err := New(key).Decrypt(v1)
-	if err != nil || got != "legacy-secret" {
-		t.Errorf("legacy decrypt = %q err=%v, want legacy-secret", got, err)
+func TestLegacyV1Rejected(t *testing.T) {
+	// v1 is no longer decryptable; it must surface as a clear error rather than
+	// being treated as plaintext.
+	if _, err := New("k").Decrypt(legacyPrefix + "anything"); err == nil {
+		t.Error("expected an error decrypting a legacy v1 value")
 	}
 }
 
 func TestNeedsUpgrade(t *testing.T) {
 	b := New("k")
-	v1, _ := seal(aeadFromKey(sha256Key("k")), legacyPrefix, "x")
 	v2, _ := b.Encrypt("x")
 
 	cases := []struct {
@@ -49,20 +40,18 @@ func TestNeedsUpgrade(t *testing.T) {
 		in   string
 		want bool
 	}{
-		{"legacy v1", v1, true},
-		{"current v2", v2, false},
 		{"plaintext", "plain-secret", true},
+		{"current v2", v2, false},
+		{"legacy v1 (cannot upgrade)", legacyPrefix + "abc", false},
 		{"empty", "", false},
 		{"json blob with v2 field", `{"email":"a@b","refresh_token":"` + v2 + `"}`, false},
-		{"json blob with v1 field", `{"email":"a@b","refresh_token":"` + v1 + `"}`, true},
 	}
 	for _, c := range cases {
 		if got := b.NeedsUpgrade(c.in); got != c.want {
 			t.Errorf("%s: NeedsUpgrade = %v, want %v", c.name, got, c.want)
 		}
 	}
-	// A disabled box never asks to upgrade.
-	if New("").NeedsUpgrade(v1) {
+	if New("").NeedsUpgrade("plain-secret") {
 		t.Error("disabled box should not request an upgrade")
 	}
 }
@@ -86,13 +75,10 @@ func TestDisabledBoxPassesThrough(t *testing.T) {
 	}
 }
 
-func TestDecryptEncryptedWithoutKeyErrors(t *testing.T) {
-	v2, _ := New("k").Encrypt("secret")
-	v1, _ := seal(aeadFromKey(sha256Key("k")), legacyPrefix, "secret")
-	for _, ct := range []string{v2, v1} {
-		if _, err := New("").Decrypt(ct); err == nil {
-			t.Errorf("expected error decrypting %q without a key", ct[:7])
-		}
+func TestDecryptV2WithoutKeyErrors(t *testing.T) {
+	ct, _ := New("k").Encrypt("secret")
+	if _, err := New("").Decrypt(ct); err == nil {
+		t.Error("expected error decrypting a v2 value without a key")
 	}
 }
 
