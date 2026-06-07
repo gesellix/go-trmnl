@@ -34,6 +34,9 @@ jobs:
   static-analysis:
     name: Static Security Analysis
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # required to upload the Semgrep SARIF to code scanning
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -48,21 +51,21 @@ jobs:
           go install honnef.co/go/tools/cmd/staticcheck@latest
           staticcheck ./...
 
-      # Semgrep results are uploaded to code scanning, which must be enabled on
-      # the repository (free for public repos). Until then these steps no-op via
-      # continue-on-error rather than failing the workflow.
+      # Run the Semgrep CLI directly (the semgrep-action wrapper is deprecated).
+      # `semgrep scan` exits 0 even with findings; results are surfaced via the
+      # SARIF upload to code scanning. continue-on-error keeps the job green when
+      # the scan or upload cannot run (e.g. SARIF upload on a forked-PR token).
       - name: Run Semgrep
-        uses: semgrep/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d # v1
-        with:
-          config: >-
-            p/security-audit
-            p/secrets
-            p/golang
-          generateSarif: "1"
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check semgrep
+          semgrep scan --sarif --output=semgrep.sarif \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/golang
         continue-on-error: true
 
       - name: Upload Semgrep SARIF
-        if: always()
+        if: always() && hashFiles('semgrep.sarif') != ''
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           sarif_file: semgrep.sarif
