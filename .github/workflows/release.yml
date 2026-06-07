@@ -1,13 +1,13 @@
 name: Release
 
 on:
-  # Release via git tag push: the workflow creates the release and its notes.
-  push:
-    tags: ["v*"]
   # Release via the GitHub UI ("Draft a new release"): GitHub owns the notes;
-  # the workflow only builds and attaches the binaries.
+  # the workflow only builds and attaches the binaries. This is the single
+  # source of truth: a bare `git push` of a tag does NOT trigger a release
+  # (that would double-fire, since publishing in the UI also creates the tag).
   release:
     types: [published]
+  # Manual fallback to (re)build assets for a tag, e.g. after a failed run.
   workflow_dispatch:
     inputs:
       tag:
@@ -37,12 +37,10 @@ jobs:
       - name: Resolve and validate tag
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TAG="${{ github.event.inputs.tag }}"
-          elif [[ "${{ github.event_name }}" == "release" ]]; then
+          if [[ "${{ github.event_name }}" == "release" ]]; then
             TAG="${{ github.event.release.tag_name }}"
           else
-            TAG="${GITHUB_REF#refs/tags/}"
+            TAG="${{ github.event.inputs.tag }}"
           fi
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
             echo "::error::Invalid tag format '$TAG' (expected vMAJOR.MINOR.PATCH[-pre])"
@@ -145,8 +143,9 @@ jobs:
           # "Edit release": a release that already exists owns its notes (created
           # via the GitHub UI, or by an earlier run of this workflow). Only
           # (re-)attach the built assets; never regenerate notes, which is what
-          # used to duplicate them. "Create release": when none exists yet (a git
-          # tag push), create it once with auto-generated notes.
+          # used to duplicate them. "Create release": only reachable via
+          # workflow_dispatch for a tag that has no release yet; create it once
+          # with auto-generated notes.
           if [[ "$EVENT" == "release" ]] || gh release view "$TAG" >/dev/null 2>&1; then
             echo "Editing existing release $TAG: uploading assets, leaving notes untouched."
             gh release upload "$TAG" "${assets[@]}" --clobber
