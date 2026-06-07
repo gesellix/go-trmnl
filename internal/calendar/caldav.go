@@ -76,12 +76,15 @@ func (s *caldavSource) Fetch(ctx context.Context, w Window) ([]Event, error) {
 	}
 
 	query := &caldav.CalendarQuery{
+		// Request the full calendar object (all properties and components) and
+		// expand recurrences server-side. Expand must be set on the top-level
+		// request (it maps to <C:expand> in <C:calendar-data>); AllProps/AllComps
+		// ensure events come back with SUMMARY/DTSTART/etc.
 		CompRequest: caldav.CalendarCompRequest{
-			Name: "VCALENDAR",
-			Comps: []caldav.CalendarCompRequest{{
-				Name:   "VEVENT",
-				Expand: &caldav.CalendarExpandRequest{Start: w.From, End: w.To}, // server-side recurrence expansion
-			}},
+			Name:     "VCALENDAR",
+			AllProps: true,
+			AllComps: true,
+			Expand:   &caldav.CalendarExpandRequest{Start: w.From, End: w.To},
 		},
 		CompFilter: caldav.CompFilter{
 			Name: "VCALENDAR",
