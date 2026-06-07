@@ -45,8 +45,9 @@ The underlying calendar data is refreshed per account on its own interval
 ## Setting up Google
 
 Reading private Google calendars requires OAuth2; there is no public-link
-shortcut. You create one OAuth client in Google Cloud and reuse it for every
-family member's Google account.
+shortcut. You create one (or more) OAuth clients in Google Cloud and add them in
+the admin UI; each Google account is then bound to a chosen client. Multiple
+clients are supported (e.g. one per Google Cloud project).
 
 ### 1. Create an OAuth client
 
@@ -74,19 +75,13 @@ family member's Google account.
      character-for-character, including the scheme and port.
 5. Copy the generated **Client ID** and **Client secret**.
 
-### 2. Configure go-trmnl
+### 2. Add the OAuth client in go-trmnl
 
-Provide the credentials via environment variables (or the equivalent flags):
-
-```sh
-export TRMNL_GOOGLE_CLIENT_ID="…apps.googleusercontent.com"
-export TRMNL_GOOGLE_CLIENT_SECRET="…"
-# Also ensure the base URL matches the redirect URI host you registered:
-export TRMNL_BASE_URL="http://192.168.1.10:8080"
-```
-
-Flags: `-google-client-id`, `-google-client-secret`. When unset, the calendar
-page shows that Google integration is disabled.
+In **Admin → Calendar → Google OAuth clients**, add the client: a name, the
+**Client ID** and the **Client secret** from step 1. The secret is stored in
+the database, encrypted at rest when a key is configured (see
+[`-secret-key`](../GETTING-STARTED.md)). You can add several clients; there are
+no env/CLI variables for them.
 
 > Note: the registered redirect URI must be reachable in your browser during the
 > consent flow. If your `base-url` is a LAN IP, run the consent flow from a
@@ -98,13 +93,14 @@ page shows that Google integration is disabled.
 
 ### 3. Add accounts
 
-1. **Admin → Calendar → Add Google account.** You are redirected to Google's
-   consent screen; approve read-only calendar access.
+1. **Admin → Calendar → Add Google account**, choosing the OAuth client to use.
+   You are redirected to Google's consent screen; approve read-only calendar
+   access.
 2. Back in the admin UI, set a short **marker** (1–2 characters shown on the
    agenda), pick which of that account's **calendars** to include, and set the
    **refresh interval** (hours; default 12).
-3. Repeat **Add Google account** for each family member. The same OAuth client
-   is reused; each consent yields a separate stored account.
+3. Repeat for each family member. Several accounts can share one client (add
+   each as a Test user in Google Cloud), or use a different client per account.
 
 ### 4. Add a screen
 
