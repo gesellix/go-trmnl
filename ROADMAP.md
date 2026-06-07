@@ -73,4 +73,14 @@ Notes and open questions:
   PROPFIND for it (go-webdav exposes no generic PROPFIND, so this needs a raw
   request + XML parse, or an upstream addition) would let CalDAV default to the
   true primary and show a "primary" badge in the picker, matching Google.
+- **Handle modified single occurrences of recurring CalDAV events
+  (`RECURRENCE-ID` overrides).** Editing one occurrence of a series makes CalDAV
+  return a separate VEVENT with the same `UID` plus a `RECURRENCE-ID`. We expand
+  the master over the window and emit the override independently, so a *retimed*
+  occurrence can show a ghost at the old time, and a same-time edit (title /
+  location) can be hidden by the `(account_id, uid, start_at)` dedup. Fix: group
+  a calendar object's events by `UID`, skip master occurrences whose start
+  matches an override's `RECURRENCE-ID`, and use the override's data instead.
+  (Single-occurrence *deletes* — `EXDATE` — and unmodified series already work.)
+  Deferred until someone hits it.
 - Possible: per-screen layout option (agenda list vs. day panels).
