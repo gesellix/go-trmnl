@@ -56,7 +56,11 @@ func (s *caldavSource) Fetch(ctx context.Context, w Window) ([]Event, error) {
 		return nil, err
 	}
 
-	// Resolve which calendar paths to query.
+	// Resolve which calendar paths to query. With nothing selected, default to a
+	// minimal set: the first discovered event calendar (CalDAV has no reliable
+	// notion of a "primary" calendar via this library, so we cannot match
+	// Google's primary exactly). Users pick the calendars they want on the
+	// account page.
 	paths := s.acc.CalDAV.CalendarPaths
 	if len(paths) == 0 {
 		cals, err := s.discoverCalendars(ctx, c)
@@ -66,6 +70,7 @@ func (s *caldavSource) Fetch(ctx context.Context, w Window) ([]Event, error) {
 		for _, cal := range cals {
 			if supportsEvents(cal) {
 				paths = append(paths, cal.Path)
+				break
 			}
 		}
 	}
