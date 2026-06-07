@@ -1,0 +1,36 @@
+{{define "content"}}
+<h1>Calendar accounts</h1>
+
+{{if .GoogleConfigured}}
+<form method="get" action="/admin/calendar/google/start" class="inline">
+  <button type="submit">Add Google account</button>
+</form>
+{{else}}
+<p class="muted">Google integration is not configured. Set <code>TRMNL_GOOGLE_CLIENT_ID</code>
+and <code>TRMNL_GOOGLE_CLIENT_SECRET</code>, and register the redirect URI
+<code>{{.BaseURL}}/admin/oauth/google/callback</code> in your Google Cloud OAuth client.</p>
+{{end}}
+
+{{if .Accounts}}
+<table class="list">
+  <thead><tr><th>Name</th><th>Provider</th><th>Marker</th><th>Refresh</th><th>Last sync</th><th></th></tr></thead>
+  <tbody>
+  {{range .Accounts}}
+    <tr>
+      <td><a href="/admin/calendar/{{.ID}}">{{.Name}}</a>{{if .Error}}<br><span class="muted">error: {{.Error}}</span>{{end}}</td>
+      <td>{{.Provider}}</td>
+      <td>{{.Marker}}</td>
+      <td>{{.Refresh}}</td>
+      <td>{{.LastSync}}</td>
+      <td>
+        <form method="post" action="/admin/calendar/{{.ID}}/sync" class="inline"><button type="submit">Sync now</button></form>
+        <form method="post" action="/admin/calendar/{{.ID}}/delete" class="inline" onsubmit="return confirm('Remove this account?')"><button type="submit" class="danger">Delete</button></form>
+      </td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">No calendar accounts yet.</p>
+{{end}}
+{{end}}

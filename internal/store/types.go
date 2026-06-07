@@ -86,3 +86,31 @@ type PlaylistItem struct {
 	Position   int
 	Visible    bool
 }
+
+// CalendarAccount is a configured calendar source (a single Google or CalDAV
+// account). Credentials and provider-specific options live in ConfigJSON.
+type CalendarAccount struct {
+	ID              int64
+	Provider        string
+	Name            string
+	Marker          string
+	ConfigJSON      string
+	RefreshInterval int // seconds between syncs
+	LastSync        sql.NullInt64
+	LastError       sql.NullString
+	CreatedAt       int64
+}
+
+// CalendarEvent is one cached event instance belonging to an account.
+type CalendarEvent struct {
+	ID        int64
+	AccountID int64
+	UID       string
+	Title     string
+	StartAt   int64 // unix seconds
+	EndAt     int64 // unix seconds
+	AllDay    bool
+	Location  string
+	Status    string
+	SyncedAt  int64
+}

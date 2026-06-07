@@ -20,6 +20,7 @@ var staticFS embed.FS
 var pages = []string{
 	"dashboard", "devices", "device", "logs",
 	"screens", "screen", "playlists", "playlist", "settings",
+	"calendar", "calendar_account",
 }
 
 type templateSet struct {

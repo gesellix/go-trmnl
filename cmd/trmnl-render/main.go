@@ -17,8 +17,11 @@ import (
 	// Embed tzdata so timezone-aware plugins work without system zoneinfo.
 	_ "time/tzdata"
 
+	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/plugins"
+	"github.com/gesellix/go-trmnl/internal/plugins/familycalendar"
 	"github.com/gesellix/go-trmnl/internal/render"
+	"github.com/gesellix/go-trmnl/internal/store"
 
 	// Register built-in plugins.
 	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
@@ -41,8 +44,22 @@ func run() error {
 	assets := flag.String("assets", ".", "assets directory (for the staticimage plugin)")
 	width := flag.Int("width", render.Width, "image width")
 	height := flag.Int("height", render.Height, "image height")
+	dbPath := flag.String("db", "", "SQLite database path (enables the familycalendar plugin to read cached events)")
 	list := flag.Bool("list", false, "list available plugins and exit")
 	flag.Parse()
+
+	// The family calendar plugin needs DB-backed access; register it with a
+	// service when -db is given, otherwise with nil (renders an empty agenda).
+	var calSvc *calendar.Service
+	if *dbPath != "" {
+		st, err := store.Open(*dbPath)
+		if err != nil {
+			return fmt.Errorf("open db: %w", err)
+		}
+		defer func() { _ = st.Close() }()
+		calSvc = calendar.NewService(st, calendar.NewGoogleOAuth("", "", ""))
+	}
+	plugins.Register(familycalendar.New(calSvc))
 
 	if *list {
 		for _, p := range plugins.All() {

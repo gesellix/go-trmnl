@@ -1,0 +1,268 @@
+package calendar
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"github.com/gesellix/go-trmnl/internal/store"
+	"golang.org/x/oauth2"
+)
+
+// Sync window: how far back and forward to fetch into the cache. The plugin can
+// then show any sub-range of this without re-fetching.
+const (
+	syncLookback = 24 * time.Hour
+	syncHorizon  = 60 * 24 * time.Hour
+)
+
+// Service orchestrates calendar accounts: syncing provider events into the
+// store cache and serving a merged agenda to the plugin. It is safe for the
+// background sync goroutine and request handlers to share one instance.
+type Service struct {
+	store *store.Store
+	oauth *GoogleOAuth
+
+	// newSource builds the provider source for an account. Overridable in tests.
+	newSource func(acc Account, deps sourceDeps) (Source, error)
+}
+
+// NewService builds the calendar service. oauth may be unconfigured; Google
+// operations then fail with a clear error until credentials are set.
+func NewService(st *store.Store, oauth *GoogleOAuth) *Service {
+	return &Service{store: st, oauth: oauth, newSource: sourceFor}
+}
+
+// OAuth exposes the Google OAuth client for the admin consent flow.
+func (s *Service) OAuth() *GoogleOAuth { return s.oauth }
+
+// Accounts returns all configured accounts as domain values.
+func (s *Service) Accounts() ([]Account, error) {
+	rows, err := s.store.ListCalendarAccounts()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Account, 0, len(rows))
+	for _, r := range rows {
+		acc, err := accountFromStore(r)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, acc)
+	}
+	return out, nil
+}
+
+// Account returns one account by ID.
+func (s *Service) Account(id int64) (Account, error) {
+	r, err := s.store.GetCalendarAccount(id)
+	if err != nil {
+		return Account{}, err
+	}
+	return accountFromStore(r)
+}
+
+// DeleteAccount removes an account and its cached events.
+func (s *Service) DeleteAccount(id int64) error { return s.store.DeleteCalendarAccount(id) }
+
+func (s *Service) deps() sourceDeps {
+	return sourceDeps{
+		oauth: s.oauth,
+		onGoogleToken: func(id int64, cfg GoogleConfig) error {
+			b, err := json.Marshal(cfg)
+			if err != nil {
+				return err
+			}
+			return s.store.SetCalendarAccountConfig(id, string(b))
+		},
+	}
+}
+
+// SyncDue syncs every account whose refresh interval has elapsed, recording the
+// outcome per account. It returns the first error encountered (others are still
+// recorded on their accounts) so the caller can log it.
+func (s *Service) SyncDue(ctx context.Context, now time.Time) error {
+	accs, err := s.Accounts()
+	if err != nil {
+		return err
+	}
+	var firstErr error
+	for _, acc := range accs {
+		if !acc.due(now) {
+			continue
+		}
+		if e := s.runSync(ctx, acc, now); e != nil && firstErr == nil {
+			firstErr = e
+		}
+	}
+	return firstErr
+}
+
+// SyncAccount forces a resync of one account regardless of its interval.
+func (s *Service) SyncAccount(ctx context.Context, id int64) error {
+	acc, err := s.Account(id)
+	if err != nil {
+		return err
+	}
+	return s.runSync(ctx, acc, time.Now())
+}
+
+// runSync fetches and stores one account, recording last_sync/last_error.
+func (s *Service) runSync(ctx context.Context, acc Account, now time.Time) error {
+	err := s.fetchAndStore(ctx, acc, now)
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	_ = s.store.SetCalendarAccountSync(acc.ID, now.Unix(), msg)
+	return err
+}
+
+func (s *Service) fetchAndStore(ctx context.Context, acc Account, now time.Time) error {
+	src, err := s.newSource(acc, s.deps())
+	if err != nil {
+		return err
+	}
+	w := Window{From: now.Add(-syncLookback), To: now.Add(syncHorizon)}
+	evs, err := src.Fetch(ctx, w)
+	if err != nil {
+		return err
+	}
+	rows := make([]store.CalendarEvent, 0, len(evs))
+	for _, e := range evs {
+		rows = append(rows, store.CalendarEvent{
+			AccountID: acc.ID,
+			UID:       e.UID,
+			Title:     e.Title,
+			StartAt:   e.Start.Unix(),
+			EndAt:     e.End.Unix(),
+			AllDay:    e.AllDay,
+			Location:  e.Location,
+			Status:    e.Status,
+		})
+	}
+	return s.store.ReplaceCalendarEvents(acc.ID, rows, now.Unix())
+}
+
+// Agenda returns the merged, deduplicated events for the given accounts within
+// the window, capped at max (0 = no cap). accountIDs empty = all accounts.
+func (s *Service) Agenda(accountIDs []int64, w Window, max int) ([]Event, error) {
+	rows, err := s.store.ListCalendarEvents(accountIDs, w.From.Unix(), w.To.Unix())
+	if err != nil {
+		return nil, err
+	}
+	markerByID, err := s.markerByID()
+	if err != nil {
+		return nil, err
+	}
+	evs := make([]Event, 0, len(rows))
+	for _, r := range rows {
+		e := Event{
+			UID:       r.UID,
+			Title:     r.Title,
+			Start:     time.Unix(r.StartAt, 0),
+			End:       time.Unix(r.EndAt, 0),
+			AllDay:    r.AllDay,
+			Location:  r.Location,
+			Status:    r.Status,
+			AccountID: r.AccountID,
+		}
+		if m := markerByID[r.AccountID]; m != "" {
+			e.Markers = []string{m}
+		}
+		evs = append(evs, e)
+	}
+	merged := Merge(evs)
+	if max > 0 && len(merged) > max {
+		merged = merged[:max]
+	}
+	return merged, nil
+}
+
+func (s *Service) markerByID() (map[int64]string, error) {
+	accs, err := s.Accounts()
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[int64]string, len(accs))
+	for _, a := range accs {
+		m[a.ID] = a.Marker
+	}
+	return m, nil
+}
+
+// NextWake returns how long the background loop should sleep: the smallest
+// account refresh interval, clamped to [1m, 1h]; 15m when there are no accounts.
+func (s *Service) NextWake() time.Duration {
+	accs, err := s.Accounts()
+	if err != nil || len(accs) == 0 {
+		return 15 * time.Minute
+	}
+	min := accs[0].RefreshInterval
+	for _, a := range accs[1:] {
+		if a.RefreshInterval < min {
+			min = a.RefreshInterval
+		}
+	}
+	switch {
+	case min < time.Minute:
+		return time.Minute
+	case min > time.Hour:
+		return time.Hour
+	default:
+		return min
+	}
+}
+
+// --- Google account management (used by the admin OAuth flow) ---
+
+// CreateGoogleAccount stores a newly authorized Google account.
+func (s *Service) CreateGoogleAccount(name, marker string, tok *oauth2.Token, email string, calendarIDs []string, refresh time.Duration) (int64, error) {
+	cfg := GoogleConfig{
+		Email:        email,
+		RefreshToken: tok.RefreshToken,
+		AccessToken:  tok.AccessToken,
+		TokenType:    tok.TokenType,
+		Expiry:       tok.Expiry,
+		CalendarIDs:  calendarIDs,
+	}
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		return 0, err
+	}
+	if name == "" {
+		name = email
+	}
+	acc, err := s.store.CreateCalendarAccount(string(ProviderGoogle), name, marker, string(b), int(refresh/time.Second))
+	if err != nil {
+		return 0, err
+	}
+	return acc.ID, nil
+}
+
+// UpdateGoogleAccount saves the editable fields and calendar selection for an
+// existing Google account, preserving its stored token.
+func (s *Service) UpdateGoogleAccount(id int64, name, marker string, calendarIDs []string, refresh time.Duration) error {
+	acc, err := s.Account(id)
+	if err != nil {
+		return err
+	}
+	cfg := acc.Config
+	cfg.CalendarIDs = calendarIDs
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return s.store.UpdateCalendarAccount(id, name, marker, string(b), int(refresh/time.Second))
+}
+
+// ListGoogleCalendars lists the calendars available to an existing account,
+// for the edit/picker page.
+func (s *Service) ListGoogleCalendars(ctx context.Context, id int64) ([]CalendarChoice, error) {
+	acc, err := s.Account(id)
+	if err != nil {
+		return nil, err
+	}
+	_, choices, err := s.oauth.AccountInfo(ctx, configToToken(acc.Config))
+	return choices, err
+}
