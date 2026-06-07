@@ -319,7 +319,7 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	dc.SetRGB(0, 0, 0)
 
 	drawCurrent(dc, d, in.Width)
-	drawForecast(dc, d, in.Width, in.Height)
+	drawForecast(dc, d, in.Width)
 	drawLabel(dc, d, in.Width, in.Height)
 	return img, nil
 }

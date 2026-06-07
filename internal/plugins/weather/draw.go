@@ -82,7 +82,7 @@ func drawCurrent(dc *gg.Context, d Data, w int) {
 }
 
 // drawForecast draws the Today/Tomorrow rows beneath a divider.
-func drawForecast(dc *gg.Context, d Data, w, h int) {
+func drawForecast(dc *gg.Context, d Data, w int) {
 	fw := float64(w)
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(2)
