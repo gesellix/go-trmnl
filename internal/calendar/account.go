@@ -18,9 +18,9 @@ const (
 // DefaultRefreshInterval is used when an account does not specify one.
 const DefaultRefreshInterval = 12 * time.Hour
 
-// Account is the domain view of a configured calendar source. The provider
-// specifics (OAuth token, selected calendars, CalDAV endpoint) live in Config,
-// shaped per provider.
+// Account is the domain view of a configured calendar source. The
+// provider-specific config (Config for Google, CalDAV for CalDAV) is filled in
+// according to Provider.
 type Account struct {
 	ID              int64
 	Provider        Provider
@@ -29,7 +29,19 @@ type Account struct {
 	RefreshInterval time.Duration
 	LastSync        time.Time // zero if never synced
 	LastError       string
-	Config          GoogleConfig // only the google fields are used for now
+	Config          GoogleConfig // populated for ProviderGoogle
+	CalDAV          CalDAVConfig // populated for ProviderCalDAV
+}
+
+// CalDAVConfig is the provider config for a CalDAV account (Apple iCloud or a
+// generic server), stored as JSON in the account row.
+type CalDAVConfig struct {
+	Endpoint string `json:"endpoint"` // e.g. https://caldav.icloud.com
+	Username string `json:"username"` // Apple ID / account username
+	Password string `json:"password"` // app-specific password (encrypted at rest)
+	// CalendarPaths are the calendar collection paths to include. Empty means
+	// all discovered calendars that support events.
+	CalendarPaths []string `json:"calendar_paths,omitempty"`
 }
 
 // GoogleConfig is the provider config stored as JSON in the account row for a
@@ -63,7 +75,14 @@ func accountFromStore(a *store.CalendarAccount) (Account, error) {
 		acc.LastSync = time.Unix(a.LastSync.Int64, 0)
 	}
 	if a.ConfigJSON != "" {
-		if err := json.Unmarshal([]byte(a.ConfigJSON), &acc.Config); err != nil {
+		var err error
+		switch acc.Provider {
+		case ProviderCalDAV:
+			err = json.Unmarshal([]byte(a.ConfigJSON), &acc.CalDAV)
+		default:
+			err = json.Unmarshal([]byte(a.ConfigJSON), &acc.Config)
+		}
+		if err != nil {
 			return Account{}, err
 		}
 	}

@@ -41,10 +41,11 @@ func (h *Handler) CalendarList(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	h.render(w, "calendar", map[string]any{
-		"Nav":              "calendar",
-		"Accounts":         rows,
-		"GoogleConfigured": h.cal.OAuth().Configured(),
-		"BaseURL":          h.baseURL,
+		"Nav":                   "calendar",
+		"Accounts":              rows,
+		"GoogleConfigured":      h.cal.OAuth().Configured(),
+		"DefaultCalDAVEndpoint": calendar.DefaultCalDAVEndpoint,
+		"BaseURL":               h.baseURL,
 	})
 }
 
@@ -130,8 +131,12 @@ func (h *Handler) CalendarAccountDetail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	selectedIDs := acc.Config.CalendarIDs
+	if acc.Provider == calendar.ProviderCalDAV {
+		selectedIDs = acc.CalDAV.CalendarPaths
+	}
 	selected := map[string]bool{}
-	for _, cid := range acc.Config.CalendarIDs {
+	for _, cid := range selectedIDs {
 		selected[cid] = true
 	}
 	type calRow struct {
@@ -142,7 +147,14 @@ func (h *Handler) CalendarAccountDetail(w http.ResponseWriter, r *http.Request) 
 	}
 	var cals []calRow
 	var listErr string
-	if choices, cerr := h.cal.ListGoogleCalendars(r.Context(), id); cerr != nil {
+	var choices []calendar.CalendarChoice
+	var cerr error
+	if acc.Provider == calendar.ProviderCalDAV {
+		choices, cerr = h.cal.ListCalDAVCalendars(r.Context(), id)
+	} else {
+		choices, cerr = h.cal.ListGoogleCalendars(r.Context(), id)
+	}
+	if cerr != nil {
 		listErr = cerr.Error()
 	} else {
 		for _, c := range choices {
@@ -185,7 +197,17 @@ func (h *Handler) CalendarAccountUpdate(w http.ResponseWriter, r *http.Request) 
 	refresh := time.Duration(parseHours(r.FormValue("refresh_hours"), 12)) * time.Hour
 	calendarIDs := r.Form["calendar_ids"]
 
-	if err := h.cal.UpdateGoogleAccount(id, name, marker, calendarIDs, refresh); err != nil {
+	acc, err := h.cal.Account(id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if acc.Provider == calendar.ProviderCalDAV {
+		err = h.cal.UpdateCalDAVAccount(id, name, marker, calendarIDs, refresh)
+	} else {
+		err = h.cal.UpdateGoogleAccount(id, name, marker, calendarIDs, refresh)
+	}
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -222,6 +244,38 @@ func (h *Handler) CalendarAccountDelete(w http.ResponseWriter, r *http.Request) 
 	}
 	_ = h.cal.DeleteAccount(id)
 	http.Redirect(w, r, "/admin/calendar", http.StatusFound)
+}
+
+// CalendarCalDAVCreate adds an Apple iCloud / generic CalDAV account from the
+// form on the calendar list page, then sends the admin to its picker page.
+func (h *Handler) CalendarCalDAVCreate(w http.ResponseWriter, r *http.Request) {
+	if h.cal == nil {
+		http.Error(w, "calendar service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	if username == "" || password == "" {
+		http.Error(w, "username and app-specific password are required", http.StatusBadRequest)
+		return
+	}
+	name := r.FormValue("name")
+	marker := r.FormValue("marker")
+	endpoint := r.FormValue("endpoint")
+	refresh := time.Duration(parseHours(r.FormValue("refresh_hours"), 12)) * time.Hour
+
+	id, err := h.cal.CreateCalDAVAccount(name, marker, endpoint, username, password, refresh)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Sync once so a bad credential surfaces immediately as last_error.
+	_ = h.cal.SyncAccount(r.Context(), id)
+	http.Redirect(w, r, "/admin/calendar/"+i64(id), http.StatusFound)
 }
 
 func randomToken() string {

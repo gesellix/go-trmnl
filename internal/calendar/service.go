@@ -72,13 +72,33 @@ func (s *Service) loadAccount(r *store.CalendarAccount) (Account, error) {
 	if err != nil {
 		return Account{}, err
 	}
-	if acc.Config.RefreshToken, err = s.box.Decrypt(acc.Config.RefreshToken); err != nil {
-		return Account{}, err
-	}
-	if acc.Config.AccessToken, err = s.box.Decrypt(acc.Config.AccessToken); err != nil {
-		return Account{}, err
+	switch acc.Provider {
+	case ProviderCalDAV:
+		if acc.CalDAV.Password, err = s.box.Decrypt(acc.CalDAV.Password); err != nil {
+			return Account{}, err
+		}
+	default:
+		if acc.Config.RefreshToken, err = s.box.Decrypt(acc.Config.RefreshToken); err != nil {
+			return Account{}, err
+		}
+		if acc.Config.AccessToken, err = s.box.Decrypt(acc.Config.AccessToken); err != nil {
+			return Account{}, err
+		}
 	}
 	return acc, nil
+}
+
+// marshalCalDAVConfig encrypts the password and serializes the config.
+func (s *Service) marshalCalDAVConfig(cfg CalDAVConfig) (string, error) {
+	var err error
+	if cfg.Password, err = s.box.Encrypt(cfg.Password); err != nil {
+		return "", err
+	}
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 // marshalGoogleConfig encrypts the token fields and serializes the config for
@@ -303,4 +323,73 @@ func (s *Service) ListGoogleCalendars(ctx context.Context, id int64) ([]Calendar
 	}
 	_, choices, err := s.oauth.AccountInfo(ctx, configToToken(acc.Config))
 	return choices, err
+}
+
+// --- CalDAV account management (Apple iCloud / generic) ---
+
+// CreateCalDAVAccount stores a CalDAV account. endpoint defaults to iCloud when
+// empty.
+func (s *Service) CreateCalDAVAccount(name, marker, endpoint, username, password string, refresh time.Duration) (int64, error) {
+	if endpoint == "" {
+		endpoint = DefaultCalDAVEndpoint
+	}
+	cfg := CalDAVConfig{Endpoint: endpoint, Username: username, Password: password}
+	j, err := s.marshalCalDAVConfig(cfg)
+	if err != nil {
+		return 0, err
+	}
+	if name == "" {
+		name = username
+	}
+	acc, err := s.store.CreateCalendarAccount(string(ProviderCalDAV), name, marker, j, int(refresh/time.Second))
+	if err != nil {
+		return 0, err
+	}
+	return acc.ID, nil
+}
+
+// UpdateCalDAVAccount saves the editable fields and calendar selection,
+// preserving the stored endpoint and credentials.
+func (s *Service) UpdateCalDAVAccount(id int64, name, marker string, calendarPaths []string, refresh time.Duration) error {
+	acc, err := s.Account(id)
+	if err != nil {
+		return err
+	}
+	cfg := acc.CalDAV
+	cfg.CalendarPaths = calendarPaths
+	j, err := s.marshalCalDAVConfig(cfg)
+	if err != nil {
+		return err
+	}
+	return s.store.UpdateCalendarAccount(id, name, marker, j, int(refresh/time.Second))
+}
+
+// ListCalDAVCalendars discovers the calendars available to an existing CalDAV
+// account, for the edit/picker page. The choice ID is the calendar path.
+func (s *Service) ListCalDAVCalendars(ctx context.Context, id int64) ([]CalendarChoice, error) {
+	acc, err := s.Account(id)
+	if err != nil {
+		return nil, err
+	}
+	src := &caldavSource{acc: acc}
+	c, err := src.client()
+	if err != nil {
+		return nil, err
+	}
+	cals, err := src.discoverCalendars(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	var choices []CalendarChoice
+	for _, cal := range cals {
+		if !supportsEvents(cal) {
+			continue
+		}
+		name := cal.Name
+		if name == "" {
+			name = cal.Path
+		}
+		choices = append(choices, CalendarChoice{ID: cal.Path, Summary: name})
+	}
+	return choices, nil
 }
