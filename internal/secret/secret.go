@@ -1,23 +1,22 @@
 // Package secret provides optional symmetric encryption for sensitive values
 // (e.g. OAuth refresh tokens, CalDAV passwords) stored in the local database. A
-// key is derived from TRMNL_SECRET_KEY; when it is unset, encryption is disabled
-// and values are stored as-is.
+// key is derived from TRMNL_SECRET_KEY with scrypt; when it is unset, encryption
+// is disabled and values are stored as-is.
 //
-// Stored values are tagged with a version:
+// Stored values are tagged:
 //
-//	enc:v2:  AES-256-GCM, key derived with scrypt (current; used for writes)
-//	enc:v1:  AES-256-GCM, key derived with SHA-256 (legacy; read-only)
+//	enc:v2:  AES-256-GCM, key derived with scrypt (current)
 //	(none)   plaintext (no key was configured when written)
 //
-// The legacy reader lets existing data keep working and be migrated to v2; new
-// data is always written as v2.
+// An older format, enc:v1: (AES-GCM with a SHA-256-derived key), is no longer
+// supported; data written by that scheme must have been migrated to v2 by a
+// prior release. A leftover v1 value decrypts to a clear error.
 package secret
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -28,8 +27,8 @@ import (
 )
 
 const (
-	legacyPrefix  = "enc:v1:" // AES-GCM with a SHA-256-derived key
-	currentPrefix = "enc:v2:" // AES-GCM with a scrypt-derived key
+	legacyPrefix  = "enc:v1:" // pre-scrypt; recognized only to report a clear error
+	currentPrefix = "enc:v2:" // AES-256-GCM with a scrypt-derived key
 )
 
 // scryptSalt is a fixed application salt. The configured key is itself the
@@ -46,8 +45,7 @@ const (
 // Box encrypts and decrypts strings. The zero value (and a nil *Box) is a valid,
 // disabled box that passes values through unchanged.
 type Box struct {
-	current cipher.AEAD // v2 (scrypt): writes and reads
-	legacy  cipher.AEAD // v1 (SHA-256): read-only, for migration
+	aead    cipher.AEAD
 	enabled bool
 }
 
@@ -59,42 +57,19 @@ func New(key string) *Box {
 	if key == "" {
 		return &Box{}
 	}
-	current := aeadFromKey(scryptKey(key))
-	legacy := aeadFromKey(sha256Key(key))
-	if current == nil || legacy == nil {
-		return &Box{}
-	}
-	return &Box{current: current, legacy: legacy, enabled: true}
-}
-
-func scryptKey(key string) []byte {
 	k, err := scrypt.Key([]byte(key), scryptSalt, scryptN, scryptR, scryptP, 32)
 	if err != nil {
-		return nil
-	}
-	return k
-}
-
-// sha256Key derives the legacy (v1) key. Retained only to read and migrate
-// data written before v2; new data uses scrypt.
-func sha256Key(key string) []byte {
-	sum := sha256.Sum256([]byte(key))
-	return sum[:]
-}
-
-func aeadFromKey(k []byte) cipher.AEAD {
-	if k == nil {
-		return nil
+		return &Box{}
 	}
 	block, err := aes.NewCipher(k)
 	if err != nil {
-		return nil
+		return &Box{}
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil
+		return &Box{}
 	}
-	return gcm
+	return &Box{aead: gcm, enabled: true}
 }
 
 // Enabled reports whether a key is configured.
@@ -106,58 +81,53 @@ func (b *Box) Encrypt(s string) (string, error) {
 	if !b.Enabled() || s == "" {
 		return s, nil
 	}
-	return seal(b.current, currentPrefix, s)
+	nonce := make([]byte, b.aead.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	ct := b.aead.Seal(nonce, nonce, []byte(s), nil)
+	return currentPrefix + base64.StdEncoding.EncodeToString(ct), nil
 }
 
-// Decrypt reverses Encrypt, dispatching on the version tag. Untagged (plaintext)
-// values are returned unchanged; a tagged value requires an enabled box.
+// Decrypt reverses Encrypt. Untagged (plaintext) values are returned unchanged;
+// a v2 value requires an enabled box; a legacy v1 value is rejected with a
+// clear error.
 func (b *Box) Decrypt(s string) (string, error) {
 	switch {
 	case strings.HasPrefix(s, currentPrefix):
-		return b.open(b.current, currentPrefix, s)
+		if !b.Enabled() {
+			return "", errors.New("secret: value is encrypted but TRMNL_SECRET_KEY is not set")
+		}
+		raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(s, currentPrefix))
+		if err != nil {
+			return "", err
+		}
+		ns := b.aead.NonceSize()
+		if len(raw) < ns {
+			return "", errors.New("secret: ciphertext too short")
+		}
+		pt, err := b.aead.Open(nil, raw[:ns], raw[ns:], nil)
+		if err != nil {
+			return "", err
+		}
+		return string(pt), nil
 	case strings.HasPrefix(s, legacyPrefix):
-		return b.open(b.legacy, legacyPrefix, s)
+		return "", errors.New("secret: enc:v1: values are no longer supported; re-enter the affected credential")
 	default:
 		return s, nil // plaintext
 	}
 }
 
-// NeedsUpgrade reports whether a stored value should be re-encrypted to the
-// current (v2) format: it is legacy (v1), or plaintext while a key is set.
+// NeedsUpgrade reports whether a stored value should be encrypted to the current
+// format. Only plaintext qualifies: already-current (v2) values are left alone,
+// and legacy v1 values can no longer be re-encrypted (they surface as a Decrypt
+// error when used).
 func (b *Box) NeedsUpgrade(stored string) bool {
 	if !b.Enabled() || stored == "" {
 		return false
 	}
-	if strings.Contains(stored, legacyPrefix) {
-		return true
+	if strings.Contains(stored, currentPrefix) || strings.Contains(stored, legacyPrefix) {
+		return false
 	}
-	return !strings.Contains(stored, currentPrefix)
-}
-
-func seal(aead cipher.AEAD, prefix, s string) (string, error) {
-	nonce := make([]byte, aead.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
-	}
-	ct := aead.Seal(nonce, nonce, []byte(s), nil)
-	return prefix + base64.StdEncoding.EncodeToString(ct), nil
-}
-
-func (b *Box) open(aead cipher.AEAD, prefix, s string) (string, error) {
-	if !b.Enabled() || aead == nil {
-		return "", errors.New("secret: value is encrypted but TRMNL_SECRET_KEY is not set")
-	}
-	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(s, prefix))
-	if err != nil {
-		return "", err
-	}
-	ns := aead.NonceSize()
-	if len(raw) < ns {
-		return "", errors.New("secret: ciphertext too short")
-	}
-	pt, err := aead.Open(nil, raw[:ns], raw[ns:], nil)
-	if err != nil {
-		return "", err
-	}
-	return string(pt), nil
+	return true
 }

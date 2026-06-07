@@ -179,5 +179,5 @@ deduplication and drawing without any network access.
   in the local SQLite database. Set `-secret-key` / `TRMNL_SECRET_KEY` to encrypt
   them at rest: AES-256-GCM with a key derived via scrypt. Without a key they are
   stored as plaintext. Values written while a key is set cannot be read after the
-  key is removed or changed, so back up the key. On startup, any plaintext or
-  older-format entries are automatically re-encrypted to the current format.
+  key is removed or changed, so back up the key. On startup, plaintext entries
+  are automatically encrypted to the current format.
