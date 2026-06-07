@@ -169,8 +169,9 @@ deduplication and drawing without any network access.
   individual instances. Cancelled instances are dropped.
 - **CalDAV/iCloud** events are fetched with an explicit property request
   (iCloud ignores `allprop`/`allcomp` and returns empty data for server-side
-  `expand`). Recurring CalDAV events therefore currently appear once at their
-  series start; client-side expansion is a planned enhancement (see ROADMAP).
+  `expand`). Recurring CalDAV events are expanded **client-side** from their
+  `RRULE` (with `EXDATE`/`RDATE`) over the sync window, so a series that started
+  in the past still shows its upcoming instances.
 - Deduplication keys on the iCalUID plus start time, with a title+time fallback
   for events without a UID. Recurring instances stay distinct.
 - All-day events are labeled "all day" and grouped on their date.

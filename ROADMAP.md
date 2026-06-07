@@ -73,10 +73,4 @@ Notes and open questions:
   PROPFIND for it (go-webdav exposes no generic PROPFIND, so this needs a raw
   request + XML parse, or an upstream addition) would let CalDAV default to the
   true primary and show a "primary" badge in the picker, matching Google.
-- **Expand recurring CalDAV events client-side.** iCloud ignores the
-  `<C:expand>` calendar-query element (returns empty data), so recurring CalDAV
-  events currently show only at their series start. Expand them in-process from
-  the master's `RRULE` over the sync window (go-ical's `RecurrenceSet` /
-  `teambition/rrule-go`, already a transitive dependency). Google already
-  expands server-side, so this is CalDAV-only.
 - Possible: per-screen layout option (agenda list vs. day panels).
