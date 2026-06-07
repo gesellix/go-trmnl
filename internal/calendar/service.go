@@ -22,25 +22,20 @@ const (
 // store cache and serving a merged agenda to the plugin. It is safe for the
 // background sync goroutine and request handlers to share one instance.
 type Service struct {
-	store   *store.Store
-	box     *secret.Box // encrypts sensitive config fields at rest (may be disabled)
-	baseURL string      // public base URL, used to build the OAuth redirect URI
+	store *store.Store
+	box   *secret.Box // encrypts sensitive config fields at rest (may be disabled)
 
 	// newSource builds the provider source for an account. Overridable in tests.
 	newSource func(acc Account, deps sourceDeps) (Source, error)
 }
 
 // NewService builds the calendar service. box encrypts stored credentials (a
-// nil box stores them as plaintext); baseURL is the server's public URL, used
-// for the Google OAuth redirect URI.
-func NewService(st *store.Store, box *secret.Box, baseURL string) *Service {
-	return &Service{store: st, box: box, baseURL: baseURL, newSource: sourceFor}
+// nil box stores them as plaintext).
+func NewService(st *store.Store, box *secret.Box) *Service {
+	return &Service{store: st, box: box, newSource: sourceFor}
 }
 
 // --- Google OAuth clients ---
-
-// redirectURL is the OAuth callback registered in each Google client.
-func (s *Service) redirectURL() string { return s.baseURL + "/admin/oauth/google/callback" }
 
 // ListOAuthClients returns the configured OAuth clients (secrets stay encrypted
 // in the rows and are not needed by callers that only list/label them).
@@ -71,8 +66,9 @@ func (s *Service) CreateOAuthClient(name, clientID, clientSecret string) (int64,
 func (s *Service) DeleteOAuthClient(id int64) error { return s.store.DeleteOAuthClient(id) }
 
 // oauthForClient builds a GoogleOAuth for the given client row, decrypting its
-// secret.
-func (s *Service) oauthForClient(id int64) (*GoogleOAuth, error) {
+// secret. redirectURL matters only for the consent + code-exchange path; pass
+// "" for token refresh and calendar listing, which do not use it.
+func (s *Service) oauthForClient(id int64, redirectURL string) (*GoogleOAuth, error) {
 	c, err := s.store.GetOAuthClient(id)
 	if err != nil {
 		return nil, fmt.Errorf("calendar: oauth client %d: %w", id, err)
@@ -81,12 +77,14 @@ func (s *Service) oauthForClient(id int64) (*GoogleOAuth, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewGoogleOAuth(c.ClientID, secret, s.redirectURL()), nil
+	return NewGoogleOAuth(c.ClientID, secret, redirectURL), nil
 }
 
 // GoogleAuthCodeURL returns the consent URL for a specific OAuth client.
-func (s *Service) GoogleAuthCodeURL(clientID int64, state string) (string, error) {
-	oauth, err := s.oauthForClient(clientID)
+// redirectURL is the callback the caller will handle and must match what is
+// registered with Google and used later in ExchangeGoogle.
+func (s *Service) GoogleAuthCodeURL(clientID int64, state, redirectURL string) (string, error) {
+	oauth, err := s.oauthForClient(clientID, redirectURL)
 	if err != nil {
 		return "", err
 	}
@@ -94,9 +92,10 @@ func (s *Service) GoogleAuthCodeURL(clientID int64, state string) (string, error
 }
 
 // ExchangeGoogle swaps an auth code for a token using a specific client and
-// returns the token and the account email.
-func (s *Service) ExchangeGoogle(ctx context.Context, clientID int64, code string) (*oauth2.Token, string, error) {
-	oauth, err := s.oauthForClient(clientID)
+// returns the token and the account email. redirectURL must match the one used
+// in GoogleAuthCodeURL.
+func (s *Service) ExchangeGoogle(ctx context.Context, clientID int64, code, redirectURL string) (*oauth2.Token, string, error) {
+	oauth, err := s.oauthForClient(clientID, redirectURL)
 	if err != nil {
 		return nil, "", err
 	}
@@ -195,7 +194,9 @@ func (s *Service) DeleteAccount(id int64) error { return s.store.DeleteCalendarA
 
 func (s *Service) deps() sourceDeps {
 	return sourceDeps{
-		googleOAuthFor: s.oauthForClient,
+		googleOAuthFor: func(clientID int64) (*GoogleOAuth, error) {
+			return s.oauthForClient(clientID, "") // refresh does not use the redirect URI
+		},
 		onGoogleToken: func(id int64, cfg GoogleConfig) error {
 			j, err := s.marshalGoogleConfig(cfg)
 			if err != nil {
@@ -395,7 +396,7 @@ func (s *Service) ListGoogleCalendars(ctx context.Context, id int64) ([]Choice, 
 	if err != nil {
 		return nil, err
 	}
-	oauth, err := s.oauthForClient(acc.Config.OAuthClientID)
+	oauth, err := s.oauthForClient(acc.Config.OAuthClientID, "") // listing uses the token, not the redirect URI
 	if err != nil {
 		return nil, err
 	}
