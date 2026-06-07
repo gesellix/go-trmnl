@@ -8,6 +8,13 @@
     <h2>Settings</h2>
     <form method="post" action="/admin/screens/{{$s.ID}}">
       <label>Name <input type="text" name="name" value="{{$s.Name}}"></label>
+      <label>Dithering mode
+        <select name="dither_mode">
+          <option value="" {{if eq .DitherMode ""}}selected{{end}}>Default (global: {{.GlobalDither}})</option>
+          <option value="floyd_steinberg" {{if eq .DitherMode "floyd_steinberg"}}selected{{end}}>Floyd-Steinberg (best for photos)</option>
+          <option value="threshold" {{if eq .DitherMode "threshold"}}selected{{end}}>Threshold (sharp, for text/UI)</option>
+        </select>
+      </label>
       <label>Settings (JSON)
         <textarea name="settings_json" rows="10">{{$s.SettingsJSON}}</textarea>
       </label>

@@ -86,7 +86,7 @@ func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *sto
 		return hash, nil
 	}
 
-	res, err := screens.Render(ctx, h.store, h.renderer, h.assetsDir, d, screen, h.ditherMode())
+	res, err := screens.Render(ctx, h.store, h.renderer, h.assetsDir, d, screen, h.ditherModeFor(screen))
 	if err != nil {
 		return "", err
 	}
@@ -110,12 +110,21 @@ func (h *Handler) cachedHash(screen *store.Screen, ttl time.Duration) (string, b
 	return screen.RenderedHash.String, true
 }
 
-// ditherMode reads the configured dithering mode, defaulting to Floyd-Steinberg.
+// ditherMode reads the global dithering mode, defaulting to Floyd-Steinberg.
 func (h *Handler) ditherMode() render.Mode {
 	if v, ok, _ := h.store.GetSetting("dither_mode"); ok {
 		return render.ParseMode(v)
 	}
 	return render.FloydSteinberg
+}
+
+// ditherModeFor resolves the effective dithering mode for a screen: its
+// per-screen override if set, otherwise the global default.
+func (h *Handler) ditherModeFor(sc *store.Screen) render.Mode {
+	if sc != nil && sc.DitherMode.Valid && sc.DitherMode.String != "" {
+		return render.ParseMode(sc.DitherMode.String)
+	}
+	return h.ditherMode()
 }
 
 func trimExt(name string) string {

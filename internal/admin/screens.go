@@ -2,6 +2,7 @@ package admin
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -80,12 +81,22 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 	if pg != nil {
 		pluginType = pg.Type
 	}
+	globalDither := "floyd_steinberg"
+	if v, ok, _ := h.store.GetSetting("dither_mode"); ok && v != "" {
+		globalDither = v
+	}
+	dither := ""
+	if sc.DitherMode.Valid {
+		dither = sc.DitherMode.String
+	}
 	h.render(w, "screen", map[string]any{
-		"Nav":        "screens",
-		"Screen":     sc,
-		"PluginType": pluginType,
-		"IsImage":    pluginType == "staticimage",
-		"BaseURL":    h.baseURL,
+		"Nav":          "screens",
+		"Screen":       sc,
+		"PluginType":   pluginType,
+		"IsImage":      pluginType == "staticimage",
+		"DitherMode":   dither,
+		"GlobalDither": globalDither,
+		"BaseURL":      h.baseURL,
 	})
 }
 
@@ -106,6 +117,10 @@ func (h *Handler) ScreenUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := h.store.UpdateScreenDither(id, parseDitherOverride(r.FormValue("dither_mode"))); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, "/admin/screens/"+chiID(r), http.StatusFound)
 }
 
@@ -121,7 +136,7 @@ func (h *Handler) ScreenPreview(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, rerr := screens.Render(r.Context(), h.store, h.renderer, h.assetsDir, nil, sc, h.ditherMode()); rerr != nil {
+	if _, rerr := screens.Render(r.Context(), h.store, h.renderer, h.assetsDir, nil, sc, h.ditherModeFor(sc)); rerr != nil {
 		http.Error(w, "render failed: "+rerr.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -189,6 +204,16 @@ func (h *Handler) ScreenDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.store.DeleteScreen(id)
 	http.Redirect(w, r, "/admin/screens", http.StatusFound)
+}
+
+// parseDitherOverride maps a screen-editor form value to a per-screen dither
+// override. An empty value (or unknown token) means "inherit the global
+// setting" and is stored as NULL.
+func parseDitherOverride(v string) sql.NullString {
+	if v == "threshold" || v == "floyd_steinberg" {
+		return sql.NullString{String: v, Valid: true}
+	}
+	return sql.NullString{}
 }
 
 func randomName() string {

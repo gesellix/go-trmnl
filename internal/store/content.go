@@ -33,11 +33,11 @@ func (s *Store) GetPlugin(id int64) (*Plugin, error) {
 
 // --- Screens ---
 
-const screenColumns = `id, plugin_id, name, settings_json, rendered_hash, rendered_at, created_at`
+const screenColumns = `id, plugin_id, name, settings_json, dither_mode, rendered_hash, rendered_at, created_at`
 
 func scanScreen(row interface{ Scan(...any) error }) (*Screen, error) {
 	var sc Screen
-	err := row.Scan(&sc.ID, &sc.PluginID, &sc.Name, &sc.SettingsJSON, &sc.RenderedHash, &sc.RenderedAt, &sc.CreatedAt)
+	err := row.Scan(&sc.ID, &sc.PluginID, &sc.Name, &sc.SettingsJSON, &sc.DitherMode, &sc.RenderedHash, &sc.RenderedAt, &sc.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -92,6 +92,15 @@ func (s *Store) UpdateScreenSettings(id int64, name, settingsJSON string) error 
 	}
 	_, err := s.db.Exec(`UPDATE screens SET name = ?, settings_json = ?, rendered_hash = NULL, rendered_at = NULL WHERE id = ?`,
 		name, settingsJSON, id)
+	return err
+}
+
+// UpdateScreenDither sets a screen's per-screen dithering override (invalid ==
+// inherit the global setting) and clears the rendered cache pointer so it
+// re-renders with the new mode.
+func (s *Store) UpdateScreenDither(id int64, mode sql.NullString) error {
+	_, err := s.db.Exec(`UPDATE screens SET dither_mode = ?, rendered_hash = NULL, rendered_at = NULL WHERE id = ?`,
+		mode, id)
 	return err
 }
 
