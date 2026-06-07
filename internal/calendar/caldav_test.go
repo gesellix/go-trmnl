@@ -36,6 +36,34 @@ const sampleICS = "BEGIN:VCALENDAR\r\n" +
 	"END:VEVENT\r\n" +
 	"END:VCALENDAR\r\n"
 
+func TestBuildCalendarQueryUsesExplicitProps(t *testing.T) {
+	// iCloud ignores allprop/allcomp and returns empty data for server-side
+	// expand, so the query must list properties explicitly and not use those.
+	q := buildCalendarQuery(Window{From: at("2026-06-01T00:00:00Z"), To: at("2026-07-01T00:00:00Z")})
+
+	if len(q.CompRequest.Comps) != 1 || q.CompRequest.Comps[0].Name != "VEVENT" {
+		t.Fatalf("expected a single VEVENT comp request, got %+v", q.CompRequest.Comps)
+	}
+	ve := q.CompRequest.Comps[0]
+	if ve.AllProps || ve.AllComps || ve.Expand != nil || q.CompRequest.AllProps || q.CompRequest.AllComps || q.CompRequest.Expand != nil {
+		t.Errorf("query must not use allprop/allcomp/expand: %+v", q.CompRequest)
+	}
+	want := map[string]bool{"SUMMARY": false, "DTSTART": false, "UID": false}
+	for _, p := range ve.Props {
+		if _, ok := want[p]; ok {
+			want[p] = true
+		}
+	}
+	for p, seen := range want {
+		if !seen {
+			t.Errorf("query missing required prop %q", p)
+		}
+	}
+	if !q.CompFilter.Comps[0].Start.Equal(at("2026-06-01T00:00:00Z")) {
+		t.Errorf("time-range start not set: %+v", q.CompFilter)
+	}
+}
+
 func TestMapICalEvent(t *testing.T) {
 	time.Local = time.UTC // deterministic all-day grouping
 

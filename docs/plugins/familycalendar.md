@@ -165,10 +165,12 @@ deduplication and drawing without any network access.
 
 ## Notes
 
-- Recurring events are expanded server-side (Google via the API, CalDAV via the
-  `expand` REPORT) so weekly meetings show as individual instances. Cancelled
-  instances are dropped. A CalDAV server that does not support `expand` will
-  return an error on sync (visible on the account row).
+- **Google** expands recurring events server-side, so weekly meetings show as
+  individual instances. Cancelled instances are dropped.
+- **CalDAV/iCloud** events are fetched with an explicit property request
+  (iCloud ignores `allprop`/`allcomp` and returns empty data for server-side
+  `expand`). Recurring CalDAV events therefore currently appear once at their
+  series start; client-side expansion is a planned enhancement (see ROADMAP).
 - Deduplication keys on the iCalUID plus start time, with a title+time fallback
   for events without a UID. Recurring instances stay distinct.
 - All-day events are labeled "all day" and grouped on their date.
