@@ -89,15 +89,65 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 	if sc.DitherMode.Valid {
 		dither = sc.DitherMode.String
 	}
-	h.render(w, "screen", map[string]any{
-		"Nav":          "screens",
-		"Screen":       sc,
-		"PluginType":   pluginType,
-		"IsImage":      pluginType == "staticimage",
-		"DitherMode":   dither,
-		"GlobalDither": globalDither,
-		"BaseURL":      h.baseURL,
-	})
+	data := map[string]any{
+		"Nav":              "screens",
+		"Screen":           sc,
+		"PluginType":       pluginType,
+		"IsImage":          pluginType == "staticimage",
+		"IsFamilyCalendar": pluginType == "familycalendar",
+		"DitherMode":       dither,
+		"GlobalDither":     globalDither,
+		"BaseURL":          h.baseURL,
+	}
+	if pluginType == "familycalendar" {
+		h.addFamilyCalendarSettings(data, sc.SettingsJSON)
+	}
+	h.render(w, "screen", data)
+}
+
+// addFamilyCalendarSettings populates the friendly familycalendar settings form
+// data: the list of calendar accounts (with the screen's current selection) and
+// the scalar options parsed from the screen's settings JSON.
+func (h *Handler) addFamilyCalendarSettings(data map[string]any, settingsJSON string) {
+	var fc struct {
+		Accounts  []int64 `json:"accounts"`
+		Days      int     `json:"days"`
+		MaxEvents int     `json:"max_events"`
+		Label     string  `json:"label"`
+		Use24h    bool    `json:"use_24h"`
+	}
+	_ = json.Unmarshal([]byte(settingsJSON), &fc)
+	selected := make(map[int64]bool, len(fc.Accounts))
+	for _, id := range fc.Accounts {
+		selected[id] = true
+	}
+	type accRow struct {
+		ID       int64
+		Name     string
+		Provider string
+		Marker   string
+		Selected bool
+	}
+	var rows []accRow
+	if h.cal != nil {
+		accs, _ := h.cal.Accounts()
+		for _, a := range accs {
+			rows = append(rows, accRow{ID: a.ID, Name: a.Name, Provider: string(a.Provider), Marker: a.Marker, Selected: selected[a.ID]})
+		}
+	}
+	days := fc.Days
+	if days <= 0 {
+		days = 14
+	}
+	maxEvents := fc.MaxEvents
+	if maxEvents <= 0 {
+		maxEvents = 30
+	}
+	data["FCAccounts"] = rows
+	data["FCDays"] = days
+	data["FCMaxEvents"] = maxEvents
+	data["FCLabel"] = fc.Label
+	data["FCUse24h"] = fc.Use24h
 }
 
 // ScreenUpdate saves a screen's name and settings JSON.
@@ -108,10 +158,22 @@ func (h *Handler) ScreenUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.FormValue("name")
-	settings := r.FormValue("settings_json")
-	if !json.Valid([]byte(settings)) {
-		http.Error(w, "settings is not valid JSON", http.StatusBadRequest)
-		return
+
+	// The familycalendar screen uses a friendly form (account checkboxes + a few
+	// options) instead of the raw JSON editor; compose its settings from those
+	// fields. Other plugins use the JSON textarea.
+	var settings string
+	if sc, gerr := h.store.GetScreen(id); gerr == nil {
+		if pg, perr := h.store.GetPlugin(sc.PluginID); perr == nil && pg.Type == "familycalendar" {
+			settings = familyCalendarSettings(r)
+		}
+	}
+	if settings == "" {
+		settings = r.FormValue("settings_json")
+		if !json.Valid([]byte(settings)) {
+			http.Error(w, "settings is not valid JSON", http.StatusBadRequest)
+			return
+		}
 	}
 	if err := h.store.UpdateScreenSettings(id, name, settings); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -214,6 +276,40 @@ func parseDitherOverride(v string) sql.NullString {
 		return sql.NullString{String: v, Valid: true}
 	}
 	return sql.NullString{}
+}
+
+// familyCalendarSettings builds the familycalendar settings JSON from the
+// friendly form fields (account checkboxes + options). No accounts selected
+// means "all accounts" (the plugin's default), so the key is omitted.
+func familyCalendarSettings(r *http.Request) string {
+	_ = r.ParseForm()
+	var accounts []int64
+	for _, s := range r.Form["accounts"] {
+		if v, ok := parseInt64(s); ok {
+			accounts = append(accounts, v)
+		}
+	}
+	m := map[string]any{}
+	if len(accounts) > 0 {
+		m["accounts"] = accounts
+	}
+	if v, ok := parseInt64(r.FormValue("days")); ok && v > 0 {
+		m["days"] = v
+	}
+	if v, ok := parseInt64(r.FormValue("max_events")); ok && v > 0 {
+		m["max_events"] = v
+	}
+	if l := r.FormValue("label"); l != "" {
+		m["label"] = l
+	}
+	if r.FormValue("use_24h") != "" {
+		m["use_24h"] = true
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }
 
 func randomName() string {
