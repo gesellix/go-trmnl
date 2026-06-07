@@ -67,12 +67,12 @@ Full walkthrough: **[Getting started](docs/GETTING-STARTED.md)**.
 
 Flags or environment variables (flags win). The essentials:
 
-| Flag              | Env                    | Default       | Purpose                                       |
-|-------------------|------------------------|---------------|-----------------------------------------------|
+| Flag              | Env                    | Default       | Purpose                                        |
+|-------------------|------------------------|---------------|------------------------------------------------|
 | `-base-url`       | `TRMNL_BASE_URL`       | auto (LAN IP) | Public URL the device uses to reach the server |
-| `-data-dir`       | `TRMNL_DATA_DIR`       | `./data`      | Root for the SQLite database and uploads      |
-| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)       | Admin UI password; empty disables auth        |
-| `-secret-key`     | `TRMNL_SECRET_KEY`     | (empty)       | Encrypts calendar credentials at rest         |
+| `-data-dir`       | `TRMNL_DATA_DIR`       | `./data`      | Root for the SQLite database and uploads       |
+| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)       | Admin UI password; empty disables auth         |
+| `-secret-key`     | `TRMNL_SECRET_KEY`     | (empty)       | Encrypts calendar credentials at rest          |
 
 The `/admin` UI uses HTTP Basic Auth when a password is set. Device endpoints
 (`/api/*`) and `/uploads` are unauthenticated, since the firmware cannot supply
