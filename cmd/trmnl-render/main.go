@@ -61,7 +61,7 @@ func run() error {
 			return fmt.Errorf("open db: %w", err)
 		}
 		defer func() { _ = st.Close() }()
-		calSvc = calendar.NewService(st, secret.New(*secretKey), "")
+		calSvc = calendar.NewService(st, secret.New(*secretKey))
 	}
 	plugins.Register(familycalendar.New(calSvc))
 

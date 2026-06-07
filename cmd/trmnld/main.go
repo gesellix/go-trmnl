@@ -69,10 +69,10 @@ func run() error {
 	}
 
 	// Family calendar: shared account/OAuth-client store + provider sync. OAuth
-	// clients are configured in the admin UI; the redirect URI is built from the
-	// public base URL.
+	// clients are configured in the admin UI; the OAuth redirect URI is derived
+	// per-request from the host the admin browses (see internal/admin).
 	secretBox := secret.New(cfg.SecretKey)
-	cal := calendar.NewService(st, secretBox, cfg.PublicBaseURL)
+	cal := calendar.NewService(st, secretBox)
 	plugins.Register(familycalendar.New(cal))
 	if !secretBox.Enabled() {
 		log.Printf("note: calendar credentials are stored unencrypted (set -secret-key/TRMNL_SECRET_KEY to enable encryption at rest)")

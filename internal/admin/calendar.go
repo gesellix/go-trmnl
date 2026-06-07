@@ -15,6 +15,22 @@ import (
 // Google consent round-trip.
 const oauthStateCookie = "trmnl_oauth_state"
 
+// oauthRedirectURL derives the Google OAuth callback from the incoming request
+// (scheme + host), so it matches whatever URL the admin used to reach the UI.
+// This decouples the OAuth redirect from the device-facing base URL: the
+// redirect can use a DNS hostname (Google rejects raw private IPs) while
+// base-url stays a LAN IP for the device's image fetches.
+func oauthRedirectURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if p := r.Header.Get("X-Forwarded-Proto"); p != "" {
+		scheme = p
+	}
+	return scheme + "://" + r.Host + "/admin/oauth/google/callback"
+}
+
 // CalendarList shows configured calendar accounts and the "add account" action.
 func (h *Handler) CalendarList(w http.ResponseWriter, r *http.Request) {
 	if h.cal == nil {
@@ -59,7 +75,7 @@ func (h *Handler) CalendarList(w http.ResponseWriter, r *http.Request) {
 		"Accounts":              rows,
 		"OAuthClients":          crows,
 		"DefaultCalDAVEndpoint": calendar.DefaultCalDAVEndpoint,
-		"RedirectURI":           h.baseURL + "/admin/oauth/google/callback",
+		"RedirectURI":           oauthRedirectURL(r),
 		"BaseURL":               h.baseURL,
 	})
 }
@@ -120,7 +136,7 @@ func (h *Handler) CalendarGoogleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	nonce := randomToken()
-	authURL, err := h.cal.GoogleAuthCodeURL(clientID, nonce)
+	authURL, err := h.cal.GoogleAuthCodeURL(clientID, nonce, oauthRedirectURL(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -172,7 +188,7 @@ func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tok, email, err := h.cal.ExchangeGoogle(r.Context(), clientID, code)
+	tok, email, err := h.cal.ExchangeGoogle(r.Context(), clientID, code, oauthRedirectURL(r))
 	if err != nil {
 		http.Error(w, "token exchange failed: "+err.Error(), http.StatusBadGateway)
 		return
@@ -187,6 +203,9 @@ func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "could not save account: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Sync immediately so the account populates (and any error surfaces), the
+	// same way adding a CalDAV account does.
+	_ = h.cal.SyncAccount(r.Context(), id)
 	http.Redirect(w, r, "/admin/calendar/"+i64(id), http.StatusFound)
 }
 

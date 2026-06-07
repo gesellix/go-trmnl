@@ -76,12 +76,14 @@ the classic **APIs & Services** paths are noted in parentheses where they differ
    - Under **Authorized redirect URIs**, add exactly:
 
      ```
-     <base-url>/admin/oauth/google/callback
+     http://<host>:8080/admin/oauth/google/callback
      ```
 
-     where `<base-url>` is your server's public base URL (the `-base-url` /
-     `TRMNL_BASE_URL` value), e.g.
-     `http://192.168.1.10:8080/admin/oauth/google/callback`. It must match
+     where `<host>` is the host you will open the admin UI with. **Google
+     rejects raw private IP addresses** (e.g. `http://192.168.1.10:8080/...`
+     fails with "device_id and device_name are required for private IP"), so
+     use a DNS or mDNS hostname, e.g.
+     `http://trmnl.local:8080/admin/oauth/google/callback`. It must match
      character-for-character, including the scheme and port.
 6. Copy the generated **Client ID** and **Client secret**.
 
@@ -93,13 +95,13 @@ the database, encrypted at rest when a key is configured (see
 [`-secret-key`](../GETTING-STARTED.md)). You can add several clients; there are
 no env/CLI variables for them.
 
-> Note: the registered redirect URI must be reachable in your browser during the
-> consent flow. If your `base-url` is a LAN IP, run the consent flow from a
-> device on that LAN. (Google permits `http://` only for loopback; for a LAN IP
-> you may need to front the server with HTTPS or use a loopback redirect during
-> setup. A localhost base URL works for the OAuth dance but a physical TRMNL on
-> the LAN cannot fetch images from it, so this is mainly a first-time-setup
-> consideration.)
+> Note: the OAuth redirect URI is derived from the host you use to reach the
+> admin UI, **not** from `-base-url`. So open the admin UI at
+> `http://<host>:8080/admin/calendar` (the same hostname you registered) when
+> adding Google accounts, and the redirect will match. This means `-base-url`
+> can stay your LAN IP for the device's image fetches, while the OAuth flow uses
+> the hostname Google requires. The hostname only needs to resolve in the
+> browser you run the consent flow from.
 
 ### 3. Add accounts
 
