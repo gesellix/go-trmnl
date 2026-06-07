@@ -65,4 +65,12 @@ Notes and open questions:
 - CalDAV is implemented for Apple iCloud and generic servers. Validate the
   discovery/query path against a real iCloud account (currently only the iCal
   event mapping is unit-tested).
+- **Detect the CalDAV default calendar (RFC 6638).** Google exposes a "primary"
+  calendar, but `go-webdav` surfaces no equivalent, so when no calendars are
+  selected CalDAV falls back to the *first discovered* one. RFC 6638 defines
+  `CALDAV:schedule-default-calendar-URL` (a property of the scheduling Inbox,
+  supported by iCloud) which names the real default. Implementing a small
+  PROPFIND for it (go-webdav exposes no generic PROPFIND, so this needs a raw
+  request + XML parse, or an upstream addition) would let CalDAV default to the
+  true primary and show a "primary" badge in the picker, matching Google.
 - Possible: per-screen layout option (agenda list vs. day panels).
