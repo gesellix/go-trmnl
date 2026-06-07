@@ -76,6 +76,10 @@ func run() error {
 	plugins.Register(familycalendar.New(cal))
 	if !secretBox.Enabled() {
 		log.Printf("note: calendar credentials are stored unencrypted (set -secret-key/TRMNL_SECRET_KEY to enable encryption at rest)")
+	} else if n, err := cal.MigrateEncryption(); err != nil {
+		log.Printf("calendar: secret migration: %v", err)
+	} else if n > 0 {
+		log.Printf("calendar: re-encrypted %d stored secret(s) to the current format", n)
 	}
 
 	r := server.New()

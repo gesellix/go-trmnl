@@ -133,6 +133,50 @@ func TestServiceEncryptsTokenAtRest(t *testing.T) {
 	}
 }
 
+func TestMigrateEncryption(t *testing.T) {
+	st := openStore(t)
+
+	// Stored without a key -> plaintext secrets.
+	plain := NewService(st, secret.New(""))
+	caldavID, err := plain.CreateCalDAVAccount("Dad", "D", "", "dad@icloud.com", "app-pass-123", 12*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientID, err := plain.CreateOAuthClient("GCP", "cid", "client-secret-xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row, _ := st.GetCalendarAccount(caldavID); !strings.Contains(row.ConfigJSON, "app-pass-123") {
+		t.Fatalf("precondition: password should be plaintext: %s", row.ConfigJSON)
+	}
+
+	// Configure a key and migrate.
+	enc := NewService(st, secret.New("master-key"))
+	n, err := enc.MigrateEncryption()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("migrated %d rows, want 2", n)
+	}
+
+	// Secrets are no longer plaintext but still recover.
+	if row, _ := st.GetCalendarAccount(caldavID); strings.Contains(row.ConfigJSON, "app-pass-123") {
+		t.Errorf("password still plaintext after migration: %s", row.ConfigJSON)
+	}
+	if acc, err := enc.Account(caldavID); err != nil || acc.CalDAV.Password != "app-pass-123" {
+		t.Errorf("caldav password not recoverable: %q err=%v", acc.CalDAV.Password, err)
+	}
+	if cl, _ := st.GetOAuthClient(clientID); strings.Contains(cl.ClientSecret, "client-secret-xyz") {
+		t.Errorf("client secret still plaintext after migration: %s", cl.ClientSecret)
+	}
+
+	// Idempotent.
+	if n2, _ := enc.MigrateEncryption(); n2 != 0 {
+		t.Errorf("second migration rewrote %d rows, want 0", n2)
+	}
+}
+
 func TestNextWakeClamps(t *testing.T) {
 	st := openStore(t)
 	svc := NewService(st, nil)

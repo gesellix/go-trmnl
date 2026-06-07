@@ -53,6 +53,13 @@ func (s *Store) ListOAuthClients() ([]*OAuthClient, error) {
 	return out, rows.Err()
 }
 
+// SetOAuthClientSecret updates only the stored client secret (used to
+// re-encrypt it to a new format).
+func (s *Store) SetOAuthClientSecret(id int64, clientSecret string) error {
+	_, err := s.db.Exec(`UPDATE oauth_clients SET client_secret = ? WHERE id = ?`, clientSecret, id)
+	return err
+}
+
 // DeleteOAuthClient removes a client. Accounts referencing it keep their stored
 // tokens but can no longer be refreshed until re-authorized against a client.
 func (s *Store) DeleteOAuthClient(id int64) error {

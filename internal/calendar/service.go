@@ -65,6 +65,77 @@ func (s *Service) CreateOAuthClient(name, clientID, clientSecret string) (int64,
 // DeleteOAuthClient removes an OAuth client.
 func (s *Service) DeleteOAuthClient(id int64) error { return s.store.DeleteOAuthClient(id) }
 
+// MigrateEncryption re-encrypts stored secrets to the current format: it
+// upgrades legacy (v1) ciphertext and encrypts any plaintext secrets, leaving
+// already-current values untouched. It is a no-op without a configured key.
+// Returns the number of rows rewritten.
+func (s *Service) MigrateEncryption() (int, error) {
+	if !s.box.Enabled() {
+		return 0, nil
+	}
+	n := 0
+
+	rows, err := s.store.ListCalendarAccounts()
+	if err != nil {
+		return 0, err
+	}
+	for _, r := range rows {
+		if !s.box.NeedsUpgrade(r.ConfigJSON) {
+			continue
+		}
+		acc, lerr := s.loadAccount(r) // decrypts v1/v2/plaintext
+		if lerr != nil {
+			return n, fmt.Errorf("calendar: migrate account %d: %w", r.ID, lerr)
+		}
+		var j string
+		switch acc.Provider {
+		case ProviderCalDAV:
+			if acc.CalDAV.Password == "" {
+				continue
+			}
+			j, lerr = s.marshalCalDAVConfig(acc.CalDAV)
+		default:
+			if acc.Config.RefreshToken == "" && acc.Config.AccessToken == "" {
+				continue
+			}
+			j, lerr = s.marshalGoogleConfig(acc.Config)
+		}
+		if lerr != nil {
+			return n, lerr
+		}
+		if lerr = s.store.SetCalendarAccountConfig(r.ID, j); lerr != nil {
+			return n, lerr
+		}
+		n++
+	}
+
+	clients, err := s.store.ListOAuthClients()
+	if err != nil {
+		return n, err
+	}
+	for _, c := range clients {
+		if !s.box.NeedsUpgrade(c.ClientSecret) {
+			continue
+		}
+		plain, lerr := s.box.Decrypt(c.ClientSecret)
+		if lerr != nil {
+			return n, fmt.Errorf("calendar: migrate oauth client %d: %w", c.ID, lerr)
+		}
+		if plain == "" {
+			continue
+		}
+		enc, lerr := s.box.Encrypt(plain)
+		if lerr != nil {
+			return n, lerr
+		}
+		if lerr = s.store.SetOAuthClientSecret(c.ID, enc); lerr != nil {
+			return n, lerr
+		}
+		n++
+	}
+	return n, nil
+}
+
 // oauthForClient builds a GoogleOAuth for the given client row, decrypting its
 // secret. redirectURL matters only for the consent + code-exchange path; pass
 // "" for token refresh and calendar listing, which do not use it.

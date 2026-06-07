@@ -175,9 +175,9 @@ deduplication and drawing without any network access.
 - Deduplication keys on the iCalUID plus start time, with a title+time fallback
   for events without a UID. Recurring instances stay distinct.
 - All-day events are labeled "all day" and grouped on their date.
-- OAuth tokens are stored in the local SQLite database. Set `TRMNL_SECRET_KEY`
-  to encrypt them at rest (AES-256-GCM); without it they are stored as
-  plaintext. Tokens written while a key is set cannot be read after the key is
-  removed or changed, so back up the key. Existing plaintext tokens keep working
-  and are upgraded to encrypted form the next time their account is saved or its
-  token is refreshed.
+- Credentials (OAuth tokens, CalDAV passwords, OAuth client secrets) are stored
+  in the local SQLite database. Set `-secret-key` / `TRMNL_SECRET_KEY` to encrypt
+  them at rest: AES-256-GCM with a key derived via scrypt. Without a key they are
+  stored as plaintext. Values written while a key is set cannot be read after the
+  key is removed or changed, so back up the key. On startup, any plaintext or
+  older-format entries are automatically re-encrypted to the current format.
