@@ -251,8 +251,12 @@ All settings are flags or environment variables (flags win):
 | `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)               | Admin UI password; empty disables auth |
 | `-cleanup-interval` | `TRMNL_CLEANUP_INTERVAL` | `1h`             | How often to prune the image cache; `0` disables |
 | `-log-retention`  | `TRMNL_LOG_RETENTION`  | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables |
+| `-google-client-id` | `TRMNL_GOOGLE_CLIENT_ID` | (empty)          | Google OAuth client ID for the [Family Calendar](plugins/familycalendar.md) plugin |
+| `-google-client-secret` | `TRMNL_GOOGLE_CLIENT_SECRET` | (empty)  | Google OAuth client secret; empty disables Google calendars |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
+Connecting Google calendars is described in the
+[Family Calendar plugin](plugins/familycalendar.md) docs.
 
 ### Rendered-image cache
 

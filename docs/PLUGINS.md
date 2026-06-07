@@ -17,6 +17,7 @@ threshold). For ways to preview a screen without a device, see
 | [Clock](plugins/clock.md)           | `clock`       | Current time, date and an optional label         |
 | [Weather](plugins/weather.md)       | `weather`     | Current conditions + 4-day forecast (Open-Meteo) |
 | [Static Image](plugins/staticimage.md) | `staticimage` | An uploaded image scaled to fit the panel     |
+| [Family Calendar](plugins/familycalendar.md) | `familycalendar` | Merged agenda from Google/Apple calendar accounts |
 
 Each page documents that plugin's settings, JSON examples and how to test it.
 
