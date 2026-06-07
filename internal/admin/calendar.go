@@ -147,7 +147,7 @@ func (h *Handler) CalendarAccountDetail(w http.ResponseWriter, r *http.Request) 
 	}
 	var cals []calRow
 	var listErr string
-	var choices []calendar.CalendarChoice
+	var choices []calendar.Choice
 	var cerr error
 	if acc.Provider == calendar.ProviderCalDAV {
 		choices, cerr = h.cal.ListCalDAVCalendars(r.Context(), id)
@@ -188,7 +188,7 @@ func (h *Handler) CalendarAccountUpdate(w http.ResponseWriter, r *http.Request) 
 		http.NotFound(w, r)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
+	if err = r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

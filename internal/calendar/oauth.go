@@ -48,8 +48,8 @@ func (g *GoogleOAuth) Exchange(ctx context.Context, code string) (*oauth2.Token,
 	return g.cfg.Exchange(ctx, code)
 }
 
-// CalendarChoice is one selectable calendar within a Google account.
-type CalendarChoice struct {
+// Choice is one selectable calendar within an account.
+type Choice struct {
 	ID      string
 	Summary string
 	Primary bool
@@ -57,7 +57,7 @@ type CalendarChoice struct {
 
 // AccountInfo fetches the account email and the list of available calendars for
 // a freshly authorized token, for the post-consent calendar picker.
-func (g *GoogleOAuth) AccountInfo(ctx context.Context, tok *oauth2.Token) (email string, choices []CalendarChoice, err error) {
+func (g *GoogleOAuth) AccountInfo(ctx context.Context, tok *oauth2.Token) (email string, choices []Choice, err error) {
 	svc, err := gcal.NewService(ctx, option.WithHTTPClient(g.cfg.Client(ctx, tok)))
 	if err != nil {
 		return "", nil, err
@@ -67,7 +67,7 @@ func (g *GoogleOAuth) AccountInfo(ctx context.Context, tok *oauth2.Token) (email
 		return "", nil, fmt.Errorf("list calendars: %w", err)
 	}
 	for _, item := range list.Items {
-		choices = append(choices, CalendarChoice{ID: item.Id, Summary: item.Summary, Primary: item.Primary})
+		choices = append(choices, Choice{ID: item.Id, Summary: item.Summary, Primary: item.Primary})
 		if item.Primary {
 			email = item.Id // the primary calendar id is the account's email
 		}

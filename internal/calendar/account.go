@@ -10,9 +10,10 @@ import (
 // Provider identifies a calendar backend.
 type Provider string
 
+// Supported calendar backends.
 const (
 	ProviderGoogle Provider = "google"
-	ProviderCalDAV Provider = "caldav" // phase 2 (Apple iCloud / generic)
+	ProviderCalDAV Provider = "caldav" // Apple iCloud / generic CalDAV
 )
 
 // DefaultRefreshInterval is used when an account does not specify one.

@@ -25,8 +25,13 @@ type Plugin struct {
 // or render golden tests without a database).
 func New(svc *calendar.Service) *Plugin { return &Plugin{svc: svc} }
 
-func (p *Plugin) Type() string                  { return "familycalendar" }
-func (p *Plugin) Title() string                 { return "Family Calendar" }
+// Type returns the registry key.
+func (p *Plugin) Type() string { return "familycalendar" }
+
+// Title returns the human-friendly plugin name.
+func (p *Plugin) Title() string { return "Family Calendar" }
+
+// DefaultRefresh returns the cache TTL hint for rendered agenda screens.
 func (p *Plugin) DefaultRefresh() time.Duration { return 15 * time.Minute }
 
 type settings struct {
@@ -56,6 +61,7 @@ type Data struct {
 	Days  []Day
 }
 
+// DataModel fetches the merged agenda for the selected accounts and window.
 func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, error) {
 	var s settings
 	if len(in.Settings) > 0 {
@@ -90,6 +96,7 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 	return Data{Label: s.Label, Days: groupByDay(events, s.Use24h)}, nil
 }
 
+// Render draws the day-grouped agenda to an RGBA image.
 func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*image.RGBA, error) {
 	d, ok := raw.(Data)
 	if !ok {

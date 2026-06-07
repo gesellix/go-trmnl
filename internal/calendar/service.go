@@ -201,8 +201,8 @@ func (s *Service) fetchAndStore(ctx context.Context, acc Account, now time.Time)
 }
 
 // Agenda returns the merged, deduplicated events for the given accounts within
-// the window, capped at max (0 = no cap). accountIDs empty = all accounts.
-func (s *Service) Agenda(accountIDs []int64, w Window, max int) ([]Event, error) {
+// the window, capped at limit (0 = no cap). accountIDs empty = all accounts.
+func (s *Service) Agenda(accountIDs []int64, w Window, limit int) ([]Event, error) {
 	rows, err := s.store.ListCalendarEvents(accountIDs, w.From.Unix(), w.To.Unix())
 	if err != nil {
 		return nil, err
@@ -229,8 +229,8 @@ func (s *Service) Agenda(accountIDs []int64, w Window, max int) ([]Event, error)
 		evs = append(evs, e)
 	}
 	merged := Merge(evs)
-	if max > 0 && len(merged) > max {
-		merged = merged[:max]
+	if limit > 0 && len(merged) > limit {
+		merged = merged[:limit]
 	}
 	return merged, nil
 }
@@ -256,19 +256,19 @@ func (s *Service) NextWake() time.Duration {
 	if err != nil || len(accs) == 0 {
 		return 15 * time.Minute
 	}
-	min := accs[0].RefreshInterval
+	smallest := accs[0].RefreshInterval
 	for _, a := range accs[1:] {
-		if a.RefreshInterval < min {
-			min = a.RefreshInterval
+		if a.RefreshInterval < smallest {
+			smallest = a.RefreshInterval
 		}
 	}
 	switch {
-	case min < time.Minute:
+	case smallest < time.Minute:
 		return time.Minute
-	case min > time.Hour:
+	case smallest > time.Hour:
 		return time.Hour
 	default:
-		return min
+		return smallest
 	}
 }
 
@@ -316,7 +316,7 @@ func (s *Service) UpdateGoogleAccount(id int64, name, marker string, calendarIDs
 
 // ListGoogleCalendars lists the calendars available to an existing account,
 // for the edit/picker page.
-func (s *Service) ListGoogleCalendars(ctx context.Context, id int64) ([]CalendarChoice, error) {
+func (s *Service) ListGoogleCalendars(ctx context.Context, id int64) ([]Choice, error) {
 	acc, err := s.Account(id)
 	if err != nil {
 		return nil, err
@@ -366,7 +366,7 @@ func (s *Service) UpdateCalDAVAccount(id int64, name, marker string, calendarPat
 
 // ListCalDAVCalendars discovers the calendars available to an existing CalDAV
 // account, for the edit/picker page. The choice ID is the calendar path.
-func (s *Service) ListCalDAVCalendars(ctx context.Context, id int64) ([]CalendarChoice, error) {
+func (s *Service) ListCalDAVCalendars(ctx context.Context, id int64) ([]Choice, error) {
 	acc, err := s.Account(id)
 	if err != nil {
 		return nil, err
@@ -380,7 +380,7 @@ func (s *Service) ListCalDAVCalendars(ctx context.Context, id int64) ([]Calendar
 	if err != nil {
 		return nil, err
 	}
-	var choices []CalendarChoice
+	var choices []Choice
 	for _, cal := range cals {
 		if !supportsEvents(cal) {
 			continue
@@ -389,7 +389,7 @@ func (s *Service) ListCalDAVCalendars(ctx context.Context, id int64) ([]Calendar
 		if name == "" {
 			name = cal.Path
 		}
-		choices = append(choices, CalendarChoice{ID: cal.Path, Summary: name})
+		choices = append(choices, Choice{ID: cal.Path, Summary: name})
 	}
 	return choices, nil
 }
