@@ -23,6 +23,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
 	"github.com/gesellix/go-trmnl/internal/plugins"
 	"github.com/gesellix/go-trmnl/internal/plugins/familycalendar"
+	"github.com/gesellix/go-trmnl/internal/secret"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
 	"github.com/gesellix/go-trmnl/internal/uploads"
@@ -68,10 +69,13 @@ func run() error {
 	// Family calendar: shared account store + provider sync. The OAuth redirect
 	// URI must match the one registered in the Google Cloud OAuth client.
 	googleOAuth := calendar.NewGoogleOAuth(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.PublicBaseURL+"/admin/oauth/google/callback")
-	cal := calendar.NewService(st, googleOAuth)
+	secretBox := secret.NewFromEnv()
+	cal := calendar.NewService(st, googleOAuth, secretBox)
 	plugins.Register(familycalendar.New(cal))
 	if !googleOAuth.Configured() {
 		log.Printf("note: family calendar Google integration disabled (set TRMNL_GOOGLE_CLIENT_ID/SECRET to enable)")
+	} else if !secretBox.Enabled() {
+		log.Printf("note: calendar OAuth tokens are stored unencrypted (set TRMNL_SECRET_KEY to enable encryption at rest)")
 	}
 
 	r := server.New()

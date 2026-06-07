@@ -21,6 +21,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/plugins"
 	"github.com/gesellix/go-trmnl/internal/plugins/familycalendar"
 	"github.com/gesellix/go-trmnl/internal/render"
+	"github.com/gesellix/go-trmnl/internal/secret"
 	"github.com/gesellix/go-trmnl/internal/store"
 
 	// Register built-in plugins.
@@ -57,7 +58,7 @@ func run() error {
 			return fmt.Errorf("open db: %w", err)
 		}
 		defer func() { _ = st.Close() }()
-		calSvc = calendar.NewService(st, calendar.NewGoogleOAuth("", "", ""))
+		calSvc = calendar.NewService(st, calendar.NewGoogleOAuth("", "", ""), secret.NewFromEnv())
 	}
 	plugins.Register(familycalendar.New(calSvc))
 
