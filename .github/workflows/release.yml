@@ -1,8 +1,13 @@
 name: Release
 
 on:
+  # Release via git tag push: the workflow creates the release and its notes.
   push:
     tags: ["v*"]
+  # Release via the GitHub UI ("Draft a new release"): GitHub owns the notes;
+  # the workflow only builds and attaches the binaries.
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -34,6 +39,8 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             TAG="${{ github.event.inputs.tag }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            TAG="${{ github.event.release.tag_name }}"
           else
             TAG="${GITHUB_REF#refs/tags/}"
           fi
@@ -124,19 +131,33 @@ jobs:
           sha256sum trmnld-* | grep -v '\.sha256$' > checksums.sha256
           cat checksums.sha256
 
-      - name: Create / update release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
-        with:
-          tag_name: ${{ needs.validate.outputs.tag }}
-          name: "go-trmnl ${{ needs.validate.outputs.tag }}"
-          generate_release_notes: true
-          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
-          files: |
-            dist/trmnld-*
-            dist/checksums.sha256
-          fail_on_unmatched_files: true
+      - name: Publish release and assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          IS_PRERELEASE: ${{ needs.validate.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+          assets=(dist/trmnld-* dist/checksums.sha256)
+
+          # "Edit release": a release that already exists owns its notes (created
+          # via the GitHub UI, or by an earlier run of this workflow). Only
+          # (re-)attach the built assets; never regenerate notes, which is what
+          # used to duplicate them. "Create release": when none exists yet (a git
+          # tag push), create it once with auto-generated notes.
+          if [[ "$EVENT" == "release" ]] || gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Editing existing release $TAG: uploading assets, leaving notes untouched."
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            echo "Creating release $TAG with generated notes."
+            args=(--title "go-trmnl $TAG" --generate-notes)
+            if [[ "$IS_PRERELEASE" == "true" ]]; then
+              args+=(--prerelease)
+            fi
+            gh release create "$TAG" "${args[@]}" "${assets[@]}"
+          fi
 
   docker:
     name: Build and push Docker image
