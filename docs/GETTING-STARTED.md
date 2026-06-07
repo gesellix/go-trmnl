@@ -240,20 +240,20 @@ returns the placeholder image — see [Device API reference](API.md).)
 
 All settings are flags or environment variables (flags win):
 
-| Flag              | Env                    | Default               | Purpose                                |
-|-------------------|------------------------|-----------------------|----------------------------------------|
-| `-listen`         | `TRMNL_LISTEN`         | `:8080`               | HTTP listen address                    |
-| `-base-url`       | `TRMNL_BASE_URL`       | auto (LAN IP)         | Public URL the device uses             |
-| `-data-dir`       | `TRMNL_DATA_DIR`       | `./data`              | Root for the database and uploads      |
-| `-db`             | `TRMNL_DB`             | `<data-dir>/trmnl.db` | SQLite database path                   |
-| `-uploads`        | `TRMNL_UPLOADS`        | `<data-dir>/uploads`  | Rendered image directory               |
-| `-admin-user`     | `TRMNL_ADMIN_USER`     | `admin`               | Admin UI username                      |
-| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)               | Admin UI password; empty disables auth |
-| `-cleanup-interval` | `TRMNL_CLEANUP_INTERVAL` | `1h`             | How often to prune the image cache; `0` disables |
-| `-log-retention`  | `TRMNL_LOG_RETENTION`  | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables |
-| `-google-client-id` | `TRMNL_GOOGLE_CLIENT_ID` | (empty)          | Google OAuth client ID for the [Family Calendar](plugins/familycalendar.md) plugin |
-| `-google-client-secret` | `TRMNL_GOOGLE_CLIENT_SECRET` | (empty)  | Google OAuth client secret; empty disables Google calendars |
-| (env only)        | `TRMNL_SECRET_KEY`     | (empty)               | Encrypts calendar OAuth tokens at rest; empty stores them as plaintext |
+| Flag                    | Env                          | Default               | Purpose                                                                            |
+|-------------------------|------------------------------|-----------------------|------------------------------------------------------------------------------------|
+| `-listen`               | `TRMNL_LISTEN`               | `:8080`               | HTTP listen address                                                                |
+| `-base-url`             | `TRMNL_BASE_URL`             | auto (LAN IP)         | Public URL the device uses                                                         |
+| `-data-dir`             | `TRMNL_DATA_DIR`             | `./data`              | Root for the database and uploads                                                  |
+| `-db`                   | `TRMNL_DB`                   | `<data-dir>/trmnl.db` | SQLite database path                                                               |
+| `-uploads`              | `TRMNL_UPLOADS`              | `<data-dir>/uploads`  | Rendered image directory                                                           |
+| `-admin-user`           | `TRMNL_ADMIN_USER`           | `admin`               | Admin UI username                                                                  |
+| `-admin-password`       | `TRMNL_ADMIN_PASSWORD`       | (empty)               | Admin UI password; empty disables auth                                             |
+| `-cleanup-interval`     | `TRMNL_CLEANUP_INTERVAL`     | `1h`                  | How often to prune the image cache; `0` disables                                   |
+| `-log-retention`        | `TRMNL_LOG_RETENTION`        | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables                    |
+| `-google-client-id`     | `TRMNL_GOOGLE_CLIENT_ID`     | (empty)               | Google OAuth client ID for the [Family Calendar](plugins/familycalendar.md) plugin |
+| `-google-client-secret` | `TRMNL_GOOGLE_CLIENT_SECRET` | (empty)               | Google OAuth client secret; empty disables Google calendars                        |
+| (env only)              | `TRMNL_SECRET_KEY`           | (empty)               | Encrypts calendar OAuth tokens at rest; empty stores them as plaintext             |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
 Connecting Google calendars is described in the

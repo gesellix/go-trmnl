@@ -57,12 +57,12 @@ and preview rendered screens.
 All device requests carry an `ID: <MAC>` header. Image URLs must use a
 LAN-reachable base URL (not `127.0.0.1`).
 
-| Method | Path           | Purpose                                                        |
-|--------|----------------|----------------------------------------------------------------|
-| GET    | `/api/setup`   | Auto-provision an unknown MAC; returns `api_key`, `friendly_id`|
-| GET    | `/api/display` | Persist telemetry, return the next screen image URL            |
-| POST   | `/api/log`     | Store device log entries (returns 204)                         |
-| GET    | `/uploads/*`   | Serve rendered images to the device                            |
+| Method | Path           | Purpose                                                         |
+|--------|----------------|-----------------------------------------------------------------|
+| GET    | `/api/setup`   | Auto-provision an unknown MAC; returns `api_key`, `friendly_id` |
+| GET    | `/api/display` | Persist telemetry, return the next screen image URL             |
+| POST   | `/api/log`     | Store device log entries (returns 204)                          |
+| GET    | `/uploads/*`   | Serve rendered images to the device                             |
 
 ## Running
 

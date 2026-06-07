@@ -1,31 +1,38 @@
 # Weather plugin
 
-Type: `weather`. Shows current conditions plus a 4-day forecast with simple
-1-bit weather icons. Data comes from the free, key-less
-[Open-Meteo](https://open-meteo.com) API. The layout is modeled on the official
+Type: `weather`. Shows current conditions (big icon + temperature, feels-like,
+humidity, wind, sunrise/sunset) and a Today/Tomorrow forecast with UV,
+precipitation probability and low/high. Simple 1-bit weather icons. Data comes
+from the free, key-less [Open-Meteo](https://open-meteo.com) API. The layout is
+modeled on the official
 [TRMNL Weather plugin](https://help.trmnl.com/en/articles/10033272-weather).
 
 [← All plugins](../PLUGINS.md)
 
 ## Settings
 
-| Key         | Type   | Default   | Notes                                                     |
-|-------------|--------|-----------|-----------------------------------------------------------|
-| `location`  | string | (empty)   | City name; geocoded when `latitude`/`longitude` are unset |
-| `latitude`  | number | `0`       | Preferred when non-zero                                   |
-| `longitude` | number | `0`       | Preferred when non-zero                                   |
-| `units`     | string | `metric`  | `metric` (°C, km/h) or `imperial` (°F, mph)              |
-| `label`     | string | `Weather` | Shown in the corner                                       |
+| Key                | Type   | Default        | Notes                                                       |
+|--------------------|--------|----------------|-------------------------------------------------------------|
+| `location`         | string | (empty)        | City name; geocoded when `latitude`/`longitude` are unset   |
+| `latitude`         | number | `0`            | Preferred when non-zero                                     |
+| `longitude`        | number | `0`            | Preferred when non-zero                                     |
+| `units`            | string | `metric`       | `metric` or `imperial`; sets defaults for the units below   |
+| `temp_unit`        | string | from `units`   | `c` or `f`                                                  |
+| `wind_unit`        | string | from `units`   | `kmh`, `mph`, `ms`, or `kn`                                 |
+| `precip_unit`      | string | from `units`   | `mm` or `inch`                                              |
+| `forecast_heading` | string | `relative`     | `relative` (Today/Tomorrow) or `date` (e.g. `Jun 8`)        |
+| `label`            | string | `Weather`      | Shown bottom-left                                           |
 
 ```json
-{ "location": "Berlin", "units": "metric", "label": "Weather" }
+{ "location": "Bonn", "temp_unit": "c", "wind_unit": "mph", "forecast_heading": "relative" }
 ```
 
 ```json
 { "latitude": 52.52, "longitude": 13.41, "units": "imperial" }
 ```
 
-Cache TTL hint: ~30 minutes.
+Cache TTL hint: ~30 minutes. The fine-grained `*_unit` settings override the
+coarse `units` default when set; `units` alone still works for back-compat.
 
 ## How to test
 
