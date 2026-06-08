@@ -7,7 +7,7 @@ require (
 	github.com/emersion/go-webdav v0.7.0
 	github.com/fogleman/gg v1.3.0
 	github.com/go-chi/chi/v5 v5.3.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/image v0.41.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.283.0
