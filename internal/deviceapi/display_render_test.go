@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gesellix/go-trmnl/internal/device"
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
@@ -26,7 +27,7 @@ func newTestServerDir(t *testing.T) (*httptest.Server, *store.Store, string) {
 	}
 	t.Cleanup(func() { st.Close() })
 	r := server.New()
-	deviceapi.New(st, "http://test.local", dir).Routes(r)
+	deviceapi.New(st, "http://test.local", dir, false).Routes(r)
 	ts := httptest.NewServer(r)
 	t.Cleanup(ts.Close)
 	return ts, st, dir
@@ -36,13 +37,14 @@ func TestDisplayRendersClockScreen(t *testing.T) {
 	ts, st, dir := newTestServerDir(t)
 
 	// Provision a device and give it a playlist with one clock screen.
+	device.Provision(st, testMAC, "", "")
 	do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "").Body.Close()
 	d, _ := st.GetDeviceByMAC(testMAC)
 	pl, _ := st.CreatePlaylist("default")
 	pg, _ := st.CreatePlugin("clock", "Clock")
 	sc, _ := st.CreateScreen(pg.ID, "Clock", `{"use_24h":true,"label":"Office"}`)
 	st.AddPlaylistItem(pl.ID, sc.ID)
-	st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true})
+	st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic")
 
 	resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{
 		"ID": testMAC, "Access-Token": d.APIKey,

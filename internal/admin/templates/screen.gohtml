@@ -26,6 +26,17 @@
       <label>Max events <input type="number" name="max_events" value="{{.FCMaxEvents}}" min="1" step="1"></label>
       <label>Label <input type="text" name="label" value="{{.FCLabel}}"></label>
       <label class="check"><input type="checkbox" name="use_24h" {{if .FCUse24h}}checked{{end}}> 24-hour times</label>
+
+      <h3>Weather</h3>
+      <label>Location name <input type="text" name="location" value="{{.FCLocation}}" placeholder="e.g. Karlsruhe"></label>
+      <label>Latitude <input type="number" name="latitude" value="{{.FCLatitude}}" step="any"></label>
+      <label>Longitude <input type="number" name="longitude" value="{{.FCLongitude}}" step="any"></label>
+      <label>Units
+        <select name="units">
+          <option value="metric" {{if eq .FCUnits "metric"}}selected{{end}}>Metric (°C, km/h)</option>
+          <option value="imperial" {{if eq .FCUnits "imperial"}}selected{{end}}>Imperial (°F, mph)</option>
+        </select>
+      </label>
       {{else}}
       <label>Settings (JSON)
         <textarea name="settings_json" rows="10">{{$s.SettingsJSON}}</textarea>
@@ -50,7 +61,16 @@
       <p class="muted">Not rendered yet.</p>
     {{end}}
     <form method="post" action="/admin/screens/{{$s.ID}}/preview">
+      <label>Preview with device/bundle
+        <select name="device_id">
+          <option value="">Default (Go fonts)</option>
+          {{range $.Devices}}
+            <option value="{{.ID}}">{{.Name}} ({{.FontBundle}})</option>
+          {{end}}
+        </select>
+      </label>
       <button type="submit">Render preview</button>
+      <p class="muted" style="font-size: 0.9em; margin-top: 0.5em;">Choose a device to see how its selected <strong>font bundle</strong> affects this screen.</p>
     </form>
   </div>
 </div>

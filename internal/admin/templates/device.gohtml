@@ -43,6 +43,13 @@
       {{end}}
     </select>
   </label>
+  <label>Font bundle
+    <select name="font_bundle">
+      <option value="classic" {{if eq $d.FontBundle "classic"}}selected{{end}}>Classic (BlockKie, NicoBold, dogicapixel)</option>
+      <option value="trmnl" {{if eq $d.FontBundle "trmnl"}}selected{{end}}>TRMNL (Hand-made pixel fonts)</option>
+    </select>
+    <p class="muted" style="margin-top: 0; font-size: 0.9em;">Bundles use assets from <code>data/uploads/assets/bundles/</code>. Global font overrides in Settings take precedence.</p>
+  </label>
   <label>Special function
     {{$fn := def "none" (ns $d.SpecialFunction)}}
     <select name="special_function">

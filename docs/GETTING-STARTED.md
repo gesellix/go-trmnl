@@ -129,13 +129,18 @@ device only.)
 
 ---
 
-## 4. Watch it register
+## 4. Register your device
 
-The first time the device calls `GET /api/setup`, `go-trmnl` **auto-registers**
-it: it creates a device record and returns a generated `api_key` and a short
-`friendly_id`. Refresh the admin **Devices** page and you'll see it appear,
-along with telemetry (battery, Wi-Fi signal, firmware version, last seen) that
-updates on every poll.
+Before the device can connect, you must manually add its MAC address to the
+server to build trust:
+
+1. In the admin UI, go to **Devices**.
+2. Enter the device's MAC address (e.g. `AA:BB:CC:DD:EE:FF`) into the **Add by MAC address** form and click **Add Device**.
+3. The device is now registered and will be given an `api_key` when it first calls `/api/setup`.
+
+Once added, you can refresh the **Devices** page to see it appear, along with
+telemetry (battery, Wi-Fi signal, firmware version, last seen) that updates on
+every poll.
 
 Open the device to set a friendly **name**, a **refresh rate** (seconds between
 polls), and which **playlist** it should show.
@@ -190,6 +195,52 @@ Lower the device's refresh rate for faster updates (at the cost of battery).
 
 ---
 
+## Customizing fonts
+
+You can override the default Go fonts with your own TTF/OTF files, or choose between built-in TRMNL font bundles. The server uses a priority hierarchy: **Custom Overrides > Font Bundles > Go Defaults**.
+
+### Font Bundles
+
+TRMNL Framework 3.1+ supports two primary font bundles:
+
+- **Classic**: The original look using *BlockKie*, *NicoBold*, and *Inter*.
+- **TRMNL**: Custom hand-made pixel fonts optimized for e-ink.
+
+You can select the bundle on a per-device basis in **Admin → Devices → (Device) → Settings**. These bundles look for specific filenames in `data/uploads/assets/bundles/{classic,trmnl}/`.
+
+To see the effect of a different font bundle:
+1. Go to **Admin → Screens** and select a screen.
+2. In the **Preview** section, use the dropdown to select a device.
+3. Click **Render preview**. The preview will now be rendered using the font bundle configured for that device.
+
+**Classic bundle** expects:
+- `Inter.ttf` (Sans and Mono)
+- `BlockKie.ttf` (Title)
+
+**TRMNL bundle** expects:
+- `TRMNL21-Regular.ttf` (Sans and Mono)
+- `TRMNL21-Bold.ttf` (Title)
+
+### Custom Overrides (Global)
+
+These settings apply to all devices and take precedence over font bundles.
+
+1. **Obtain fonts**: You can use any TTF or OTF font. For the official TRMNL look, you can download the font bundles from the [Framework Releases](https://trmnl.com/framework/releases) page.
+    - [TRMNL Font Bundle](https://trmnl.com/fonts/bundles/trmnl/trmnl-fonts-bundle--trmnl.zip) (Recommended for e-ink)
+    - [Classic Font Bundle](https://trmnl.com/fonts/bundles/classic/trmnl-fonts-bundle--classic.zip)
+2. **Upload fonts**: Put your font files (e.g., `Inter-Regular.ttf`) into the `data/uploads/assets/` directory of your `go-trmnl` installation.
+3. **Configure in Admin UI**:
+    - Go to **Settings** in the Admin UI.
+    - Enter the filename of your uploaded font in the corresponding field:
+        - **Sans-serif font**: Used for most standard text.
+        - **Monospace font**: Used for code, data, or technical information.
+        - **Title font**: Used for headers and bold text.
+4. **Save**: Click **Save**.
+
+### Automatic Defaults
+
+If no custom fonts are provided and no bundle assets are found in `data/uploads/assets/bundles/`, the server falls back to built-in Go fonts.
+
 ## Testing screens without a device
 
 You don't need a registered device (or even the server) to see what a screen
@@ -215,14 +266,15 @@ Create a screen under **Admin → Screens**, edit its settings, and click
 `/uploads/<hash>.png`.
 
 **3. Simulate a real device over HTTP.**
-Because `GET /api/setup` auto-provisions, "registering" is just one request.
-This exercises the full display path (telemetry, playlist selection, caching):
+Because devices must be pre-registered, you must first add the MAC to the server
+via the admin UI (step 4). Then you can exercise the full display path
+(telemetry, playlist selection, caching):
 
 ```sh
 BASE=http://localhost:8080
 MAC=AA:BB:CC:DD:EE:FF
 
-# Auto-register and grab the api_key.
+# Grab the api_key for the pre-registered MAC.
 KEY=$(curl -s -H "ID: $MAC" $BASE/api/setup | sed -n 's/.*"api_key":"\([^"]*\)".*/\1/p')
 
 # Assign the seeded "Example" playlist to this simulated device in the admin UI
@@ -240,19 +292,19 @@ returns the placeholder image — see [Device API reference](API.md).)
 
 All settings are flags or environment variables (flags win):
 
-| Flag                    | Env                          | Default               | Purpose                                                                            |
-|-------------------------|------------------------------|-----------------------|------------------------------------------------------------------------------------|
-| `-listen`               | `TRMNL_LISTEN`               | `:8080`               | HTTP listen address                                                                |
-| `-base-url`             | `TRMNL_BASE_URL`             | auto (LAN IP)         | Public URL the device uses                                                         |
-| `-data-dir`             | `TRMNL_DATA_DIR`             | `./data`              | Root for the database and uploads                                                  |
-| `-db`                   | `TRMNL_DB`                   | `<data-dir>/trmnl.db` | SQLite database path                                                               |
-| `-uploads`              | `TRMNL_UPLOADS`              | `<data-dir>/uploads`  | Rendered image directory                                                           |
-| `-admin-user`           | `TRMNL_ADMIN_USER`           | `admin`               | Admin UI username                                                                  |
-| `-admin-password`       | `TRMNL_ADMIN_PASSWORD`       | (empty)               | Admin UI password; empty disables auth                                             |
-| `-cleanup-interval`     | `TRMNL_CLEANUP_INTERVAL`     | `1h`                  | How often to prune the image cache; `0` disables                                   |
-| `-log-retention`        | `TRMNL_LOG_RETENTION`        | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables                    |
-| `-secret-key`           | `TRMNL_SECRET_KEY`           | auto-generated        | Key to encrypt stored credentials at rest; default is a key generated under the data dir |
-| `-no-encryption`        | `TRMNL_NO_ENCRYPTION`        | `false`               | Store credentials in plaintext instead of encrypting them                          |
+| Flag                | Env                      | Default               | Purpose                                                                                  |
+|---------------------|--------------------------|-----------------------|------------------------------------------------------------------------------------------|
+| `-listen`           | `TRMNL_LISTEN`           | `:8080`               | HTTP listen address                                                                      |
+| `-base-url`         | `TRMNL_BASE_URL`         | auto (LAN IP)         | Public URL the device uses                                                               |
+| `-data-dir`         | `TRMNL_DATA_DIR`         | `./data`              | Root for the database and uploads                                                        |
+| `-db`               | `TRMNL_DB`               | `<data-dir>/trmnl.db` | SQLite database path                                                                     |
+| `-uploads`          | `TRMNL_UPLOADS`          | `<data-dir>/uploads`  | Rendered image directory                                                                 |
+| `-admin-user`       | `TRMNL_ADMIN_USER`       | `admin`               | Admin UI username                                                                        |
+| `-admin-password`   | `TRMNL_ADMIN_PASSWORD`   | (empty)               | Admin UI password; empty disables auth                                                   |
+| `-cleanup-interval` | `TRMNL_CLEANUP_INTERVAL` | `1h`                  | How often to prune the image cache; `0` disables                                         |
+| `-log-retention`    | `TRMNL_LOG_RETENTION`    | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables                          |
+| `-secret-key`       | `TRMNL_SECRET_KEY`       | auto-generated        | Key to encrypt stored credentials at rest; default is a key generated under the data dir |
+| `-no-encryption`    | `TRMNL_NO_ENCRYPTION`    | `false`               | Store credentials in plaintext instead of encrypting them                                |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
 Google OAuth clients and calendar accounts are configured entirely in

@@ -15,13 +15,15 @@ All device requests send an `ID` header containing the device's MAC address.
 Image URLs returned by the server must be reachable by the device on the LAN.
 None of these endpoints are authenticated by username/password — the device is
 identified by its MAC (`ID`) and, after setup, its `Access-Token`.
+Authentication can be disabled globally with `-no-device-auth`.
 
 ---
 
 ## `GET /api/setup`
 
-Auto-provisions an unknown device and returns its credentials. Calling it again
-for the same MAC returns the existing credentials (idempotent).
+Returns the credentials for a pre-registered device. Unknown devices are not
+automatically provisioned and return a `404 Not Found`. Calling it again
+for a registered MAC returns the existing credentials (idempotent).
 
 **Request headers**
 
@@ -100,8 +102,17 @@ screen, ensures a rendered 800×480 1-bit image exists, and returns it.
 | `temperature_profile` | Display temperature profile                                    |
 
 `update_firmware` and `reset_firmware` are **one-shot**: the server clears them
-after serving once, to avoid boot loops. An unknown device or a wrong
-`Access-Token` returns `404` problem-details.
+after serving once, to avoid boot loops.
+
+### Authentication & Pre-registration
+
+- **Pre-registration:** Devices must be manually added by MAC address in the
+  Admin UI (**Devices → Add by MAC address**) before their first contact.
+- **Access-Token:** By default, a valid `Access-Token` (the `api_key` from setup)
+  is required for `/api/display`.
+- **Disabling Auth:** Start `trmnld` with `-no-device-auth` (or set
+  `TRMNL_NO_DEVICE_AUTH=1`) to skip token validation entirely. This is useful
+  for simple BYOS setups where network security is handled elsewhere.
 
 The matching image is also served at `GET /uploads/<hash>.bmp` (and a `.png` of
 the same render, used for previews in the admin UI).
@@ -110,7 +121,7 @@ the same render, used for previews in the admin UI).
 
 ## `POST /api/log`
 
-Stores a batch of device log entries.
+Stores a batch of device log entries. An unknown device is rejected.
 
 **Request headers:** `ID` (MAC address).
 
@@ -142,9 +153,7 @@ Stores a batch of device log entries.
 
 All fields are optional except that the request must be valid JSON. Entries are
 stored against the device and shown under **Devices → Logs** in the admin UI.
-
-**Response:** `204 No Content`. An unknown device returns `404`; an unparsable
-body returns `422`.
+An unparsable body returns `422`.
 
 ---
 

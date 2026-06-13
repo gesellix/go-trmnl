@@ -1,5 +1,14 @@
 {{define "content"}}
 <h1>Devices</h1>
+
+<div class="card">
+  <form action="/admin/devices" method="post" class="inline">
+    <label for="mac">Add by MAC address:</label>
+    <input type="text" name="mac" id="mac" placeholder="AA:BB:CC..." required>
+    <button type="submit">Add Device</button>
+  </form>
+</div>
+
 {{if .Devices}}
 <table>
   <thead><tr><th>Friendly ID</th><th>Name</th><th>MAC</th><th>FW</th><th>Battery</th><th>RSSI</th><th>Last seen</th></tr></thead>

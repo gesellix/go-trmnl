@@ -13,6 +13,7 @@ import (
 	"github.com/fogleman/gg"
 	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/plugins"
+	"github.com/gesellix/go-trmnl/internal/plugins/weather"
 )
 
 // Plugin renders the merged family agenda. It reads events from the shared
@@ -40,6 +41,12 @@ type settings struct {
 	MaxEvents int     `json:"max_events"` // cap on events shown (default 30)
 	Label     string  `json:"label"`      // optional title
 	Use24h    bool    `json:"use_24h"`
+
+	// Weather integration
+	Location  string  `json:"location"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Units     string  `json:"units"` // "metric" or "imperial"
 }
 
 // Item is one rendered agenda entry.
@@ -57,8 +64,11 @@ type Day struct {
 
 // Data is the render model.
 type Data struct {
-	Label string
-	Days  []Day
+	Label   string
+	Days    []Day
+	Weather *weather.Data
+	Now     time.Time
+	Use24h  bool
 }
 
 // DataModel fetches the merged agenda for the selected accounts and window.
@@ -93,7 +103,35 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 		events = evs
 	}
 
-	return Data{Label: s.Label, Days: groupByDay(events, s.Use24h)}, nil
+	var weatherData *weather.Data
+	if (s.Latitude != 0 && s.Longitude != 0) || s.Location != "" {
+		wp, ok := plugins.Get("weather")
+		if ok {
+			wIn := in
+			wSettings := map[string]any{
+				"location":  s.Location,
+				"latitude":  s.Latitude,
+				"longitude": s.Longitude,
+				"units":     s.Units,
+			}
+			if b, err := json.Marshal(wSettings); err == nil {
+				wIn.Settings = b
+				if rawW, err := wp.DataModel(ctx, wIn); err == nil {
+					if wd, ok := rawW.(weather.Data); ok {
+						weatherData = &wd
+					}
+				}
+			}
+		}
+	}
+
+	return Data{
+		Label:   s.Label,
+		Days:    groupByDay(events, s.Use24h),
+		Weather: weatherData,
+		Now:     now,
+		Use24h:  s.Use24h,
+	}, nil
 }
 
 // Render draws the day-grouped agenda to an RGBA image.
@@ -107,7 +145,7 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	dc.SetRGB(1, 1, 1)
 	dc.Clear()
 	dc.SetRGB(0, 0, 0)
-	drawAgenda(dc, d, in.Width, in.Height)
+	drawAgenda(dc, in.Fonts, d, in.Width, in.Height)
 	return img, nil
 }
 

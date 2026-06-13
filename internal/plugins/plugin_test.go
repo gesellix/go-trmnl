@@ -51,15 +51,53 @@ func TestRegisterDuplicatePanics(t *testing.T) {
 }
 
 func TestFaceCaches(t *testing.T) {
-	a, err := Face(24, false)
+	a, err := FaceStyle(24, StyleSans)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, _ := Face(24, false)
+	b, _ := FaceStyle(24, StyleSans)
 	if a != b {
-		t.Error("Face should return the same cached face for identical params")
+		t.Error("FaceStyle should return the same cached face for identical params")
 	}
-	if c, _ := Face(24, true); c == a {
-		t.Error("bold and regular faces should differ")
+	if c, _ := FaceStyle(24, StyleTitle); c == a {
+		t.Error("different styles should differ")
+	}
+}
+
+func TestFontSetIsolatedCaches(t *testing.T) {
+	// Each FontSet owns its own face cache, so two sets never share faces even
+	// for identical params. This is what makes concurrent renders with
+	// different bundles safe.
+	a := NewFontSet("", "classic", "", "", "")
+	b := NewFontSet("", "classic", "", "", "")
+
+	fa, err := a.Face(20, StyleSans)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fa2, _ := a.Face(20, StyleSans)
+	if fa != fa2 {
+		t.Error("a FontSet should return the same cached face for identical params")
+	}
+	if fb, _ := b.Face(20, StyleSans); fb == fa {
+		t.Error("distinct FontSets should not share faces")
+	}
+}
+
+func TestFontSetFallsBackToGoFonts(t *testing.T) {
+	// A missing override file falls back to the built-in Go fonts rather than
+	// erroring, so rendering always succeeds.
+	fs := NewFontSet(".", "classic", "non-existent.ttf", "", "")
+	if _, err := fs.Face(20, StyleSans); err != nil {
+		t.Fatalf("Face should fall back to Go fonts, got error: %v", err)
+	}
+}
+
+func TestNilFontSetUsesDefault(t *testing.T) {
+	// A nil FontSet (e.g. a draw-only unit test) falls back to the package
+	// default Go fonts.
+	var fs *FontSet
+	if _, err := fs.Face(20, StyleSans); err != nil {
+		t.Fatalf("nil FontSet should use the default set, got error: %v", err)
 	}
 }

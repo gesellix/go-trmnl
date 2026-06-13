@@ -10,13 +10,13 @@ import (
 
 const margin = 28
 
-func setFace(dc *gg.Context, size float64, bold bool) {
-	if f, err := plugins.Face(size, bold); err == nil {
+func setFace(dc *gg.Context, fs *plugins.FontSet, size float64, style plugins.FontStyle) {
+	if f, err := fs.Face(size, style); err == nil {
 		dc.SetFontFace(f)
 	}
 }
 
-func draw(dc *gg.Context, d Data, w, h int) {
+func draw(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	fw, fh := float64(w), float64(h)
 
 	// --- Top: two big numbers with a dotted separator bar each ---
@@ -25,16 +25,16 @@ func draw(dc *gg.Context, d Data, w, h int) {
 	drawDottedBar(dc, fw/2+margin, colTop, colBot)
 
 	dc.SetRGB(0, 0, 0)
-	setFace(dc, 110, true)
+	setFace(dc, fs, 110, plugins.StyleTitle)
 	dc.DrawStringAnchored(fmt.Sprintf("%d", d.Passed), margin+28, 110, 0, 0.5)
 	dc.DrawStringAnchored(fmt.Sprintf("%d", d.Left), fw/2+margin+22, 110, 0, 0.5)
 
-	setFace(dc, 30, false)
+	setFace(dc, fs, 30, plugins.StyleSans)
 	dc.DrawStringAnchored("Days Passed", margin+30, 178, 0, 0.5)
 	dc.DrawStringAnchored("Days Left", fw/2+margin+24, 178, 0, 0.5)
 
 	if d.Label != "" {
-		setFace(dc, 24, false)
+		setFace(dc, fs, 24, plugins.StyleSans)
 		dc.DrawStringAnchored(d.Label, fw-margin, 60, 1, 0.5)
 	}
 
@@ -50,7 +50,7 @@ func draw(dc *gg.Context, d Data, w, h int) {
 	dc.DrawLine(margin, footerY-20, fw-margin, footerY-20)
 	dc.Stroke()
 	drawCalendarGlyph(dc, margin+10, footerY-2, 18)
-	setFace(dc, 20, true)
+	setFace(dc, fs, 20, plugins.StyleTitle)
 	dc.DrawStringAnchored("Days Left This Year", margin+34, footerY, 0, 0.5)
 	dc.DrawStringAnchored(fmt.Sprintf("%d", d.Year), fw-margin, footerY, 1, 0.5)
 }

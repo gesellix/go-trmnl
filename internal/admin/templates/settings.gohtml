@@ -7,7 +7,20 @@
       <option value="threshold" {{if eq .DitherMode "threshold"}}selected{{end}}>Threshold (sharp, for text/UI)</option>
     </select>
   </label>
-  <button type="submit">Save</button>
+  <div style="margin-top: 1em;">
+    <h3>Fonts</h3>
+    <p class="muted">Enter the filename of a TTF/OTF font uploaded to <code>data/uploads/assets/</code>. <strong>Note:</strong> These filenames override both font bundles and Go defaults for all devices.</p>
+    <label>Sans-serif font (standard text)
+      <input type="text" name="font_sans" value="{{.FontSans}}" placeholder="e.g. Inter-Regular.ttf">
+    </label>
+    <label>Monospace font (code/data)
+      <input type="text" name="font_mono" value="{{.FontMono}}" placeholder="e.g. JetBrainsMono-Regular.ttf">
+    </label>
+    <label>Title font (headers/bold)
+      <input type="text" name="font_title" value="{{.FontTitle}}" placeholder="e.g. Roboto-Bold.ttf">
+    </label>
+  </div>
+  <button type="submit" style="margin-top: 1em;">Save</button>
 </form>
 
 <h2>Server</h2>

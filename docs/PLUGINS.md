@@ -12,14 +12,14 @@ threshold). For ways to preview a screen without a device, see
 
 ## Built-in plugins
 
-| Plugin                                       | Type             | Summary                                                   |
-|----------------------------------------------|------------------|-----------------------------------------------------------|
-| [Clock](plugins/clock.md)                    | `clock`          | Current time, date and an optional label                  |
-| [Weather](plugins/weather.md)                | `weather`        | Current conditions + Today/Tomorrow forecast (Open-Meteo) |
-| [Static Image](plugins/staticimage.md)       | `staticimage`    | An uploaded image scaled to fit the panel                 |
-| [Family Calendar](plugins/familycalendar.md) | `familycalendar` | Merged agenda from Google/Apple calendar accounts         |
-| [Days Left This Year](plugins/daysleft.md)   | `days_left_year` | Year-progress numbers + a dot grid of the year            |
-| [Quote](plugins/quote.md)                    | `quote`          | A quotation from a selectable provider                    |
+| Plugin                                       | Type             | Summary                                                                 |
+|----------------------------------------------|------------------|-------------------------------------------------------------------------|
+| [Clock](plugins/clock.md)                    | `clock`          | Current time, date and an optional label                                |
+| [Weather](plugins/weather.md)                | `weather`        | Current conditions + Today/Tomorrow forecast (Open-Meteo)               |
+| [Static Image](plugins/staticimage.md)       | `staticimage`    | An uploaded image scaled to fit the panel                               |
+| [Family Calendar](plugins/familycalendar.md) | `familycalendar` | Merged agenda from Google/Apple calendar accounts with weather forecast |
+| [Days Left This Year](plugins/daysleft.md)   | `days_left_year` | Year-progress numbers + a dot grid of the year                          |
+| [Quote](plugins/quote.md)                    | `quote`          | A quotation from a selectable provider                                  |
 
 Each page documents that plugin's settings, JSON examples and how to test it.
 

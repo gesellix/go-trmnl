@@ -46,6 +46,8 @@ type Config struct {
 	SecretKey string
 	// DisableEncryption opts out of encryption, storing credentials in plaintext.
 	DisableEncryption bool
+	// DisableDeviceAuth opts out of Access-Token validation for devices.
+	DisableDeviceAuth bool
 }
 
 // Load parses configuration from the given args (typically os.Args[1:]),
@@ -64,6 +66,7 @@ func Load(args []string) (*Config, error) {
 	logRetention := fs.String("log-retention", env("TRMNL_LOG_RETENTION", "32d"), "How long to keep device logs (e.g. 32d, 720h); 0 disables")
 	secretKey := fs.String("secret-key", env("TRMNL_SECRET_KEY", ""), "Key to encrypt stored credentials at rest (default: a key auto-generated under the data dir)")
 	noEncryption := fs.Bool("no-encryption", envBool("TRMNL_NO_ENCRYPTION"), "Store credentials in plaintext instead of encrypting them")
+	noDeviceAuth := fs.Bool("no-device-auth", envBool("TRMNL_NO_DEVICE_AUTH"), "Disable Access-Token validation for devices")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -90,6 +93,7 @@ func Load(args []string) (*Config, error) {
 		LogRetention:      logRetentionDur,
 		SecretKey:         *secretKey,
 		DisableEncryption: *noEncryption,
+		DisableDeviceAuth: *noDeviceAuth,
 	}
 
 	if c.PublicBaseURL == "" {

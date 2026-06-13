@@ -27,6 +27,7 @@ type Device struct {
 	FirmwareURL     sql.NullString
 	ResetFirmware   bool
 	SpecialFunction sql.NullString
+	FontBundle      string
 }
 
 // DeviceLog is a single log entry reported by a device.

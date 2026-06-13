@@ -23,7 +23,8 @@ type RenderInput struct {
 	Now       time.Time
 	Width     int
 	Height    int
-	AssetsDir string // directory holding uploaded assets (for static images)
+	AssetsDir string   // directory holding uploaded assets (for static images)
+	Fonts     *FontSet // resolved fonts for this render (nil falls back to Go fonts)
 }
 
 // Plugin renders a screen. DataModel is split from Render so that network/IO
