@@ -154,7 +154,7 @@ self_update() {
     return
   fi
 
-  local url="https://raw.githubusercontent.com/gesellix/go-trmnl/${VERSION}/_/raspberry-pi/install.sh"
+  local url="https://raw.githubusercontent.com/gesellix/go-trmnl/${VERSION}/scripts/raspberry-pi/install.sh"
   local tmp_script="/tmp/trmnl-install-${VERSION}.sh"
 
   log "Checking for installer updates for ${VERSION}..."
