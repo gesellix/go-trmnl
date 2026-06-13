@@ -6,7 +6,7 @@ Dieses Skript installiert `trmnld` als Systemd-Service auf einem Raspberry Pi (o
 
 ```bash
 curl -fsSL -o install.sh \
-  https://raw.githubusercontent.com/gesellix/go-trmnl/main/_/raspberry-pi/install.sh
+  https://raw.githubusercontent.com/gesellix/go-trmnl/main/scripts/raspberry-pi/install.sh
 sudo bash install.sh
 ```
 
