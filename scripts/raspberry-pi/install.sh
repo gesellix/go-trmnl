@@ -265,7 +265,7 @@ reload_enable_start() {
   log "Verifying service health..."
   # Try to extract port from TRMNL_LISTEN (e.g. :8080 -> 8080)
   local port="${TRMNL_LISTEN##*:}"
-  local health_url="http://localhost:${port}/admin"
+  local health_url="http://localhost:${port}/healthz"
   local max_retries=5
   local count=0
   local success=false
@@ -283,7 +283,7 @@ reload_enable_start() {
   if [[ "$success" = true ]]; then
     log "✅ Service is healthy and responding!"
   else
-    log "⚠️ Service started but did not respond to /admin at $health_url within timeout."
+    log "⚠️ Service started but did not respond to /healthz at $health_url within timeout."
     log "Check logs with: journalctl -u ${SERVICE_NAME}.service -n 50"
   fi
 }
