@@ -83,6 +83,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/", h.Dashboard)
 
 		r.Get("/devices", h.DevicesList)
+		r.Post("/devices", h.DeviceCreate)
 		r.Get("/devices/{id}", h.DeviceDetail)
 		r.Post("/devices/{id}", h.DeviceUpdate)
 		r.Post("/devices/{id}/refresh", h.DeviceForceRefresh)

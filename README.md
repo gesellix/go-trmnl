@@ -13,8 +13,12 @@ server, renders the returned 800x480 1-bit image, then sleeps for its
 
 ## What you can do
 
-- **Auto-provision devices.** Point a TRMNL at `<base-url>` and it registers
-  itself on its first call — no manual key entry.
+- **Trust-based device registration.** Add a device's MAC address in the admin
+  UI to authorize it — no open registration by default.
+- **Custom fonts & TRMNL alignment.** Supports abstract font families (`Sans`,
+  `Mono`, `Title`) to align with the TRMNL framework. You can select between
+  the **Classic** and **TRMNL** font bundles in device settings. These can be
+  globally overridden with your own TTF/OTF files in the **Settings** UI.
 - **Build screens from plugins** and arrange them into **playlists** that the
   device cycles through (one playlist per device, advanced each poll; multiple
   devices, each with its own position).
@@ -56,10 +60,10 @@ docker run -p 8080:8080 -v trmnl-data:/data \
   ghcr.io/gesellix/go-trmnl:latest
 ```
 
-Then open `http://<your-lan-ip>:8080/admin`, and set your TRMNL device's custom
-server URL to `<base-url>` — it auto-registers on its first poll. Use a
-**LAN-reachable** base URL (not `127.0.0.1`), since the device fetches images
-from it.
+Then open `http://<your-lan-ip>:8080/admin`, add your device's MAC address
+under **Devices**, and set your TRMNL device's custom server URL to `<base-url>`.
+Use a **LAN-reachable** base URL (not `127.0.0.1`), since the device fetches
+images from it.
 
 Full walkthrough: **[Getting started](docs/GETTING-STARTED.md)**.
 

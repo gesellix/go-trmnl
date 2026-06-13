@@ -89,7 +89,7 @@ func run() error {
 	r := server.New()
 
 	// Firmware-facing device API.
-	deviceapi.New(st, cfg.PublicBaseURL, cfg.UploadsDir).Routes(r)
+	deviceapi.New(st, cfg.PublicBaseURL, cfg.UploadsDir, cfg.DisableDeviceAuth).Routes(r)
 
 	// Rendered images, fetched by the device on the LAN.
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadsDir))))

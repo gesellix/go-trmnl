@@ -3,11 +3,12 @@ package deviceapi
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/gesellix/go-trmnl/internal/device"
 	"github.com/gesellix/go-trmnl/internal/httpx"
 	"github.com/gesellix/go-trmnl/internal/store"
 )
@@ -22,28 +23,33 @@ type setupResponse struct {
 	Message    string `json:"message"`
 }
 
-// Setup auto-provisions an unknown device and returns its credentials.
+// Setup returns the credentials for a pre-registered device.
 func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 	mac := macFromCtx(r.Context())
-	d, created, err := device.Provision(h.store, mac, r.Header.Get("Model"), r.Header.Get("FW-Version"))
+	log.Printf("deviceapi: setup request for MAC %s from %s", mac, r.RemoteAddr)
+
+	d, err := h.store.GetDeviceByMAC(mac)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			log.Printf("deviceapi: setup for unknown MAC %s", mac)
+			httpx.WriteJSON(w, http.StatusNotFound, setupResponse{
+				Status: http.StatusNotFound,
+			})
+			return
+		}
 		httpx.WriteProblem(w, http.StatusInternalServerError, "/problem#device_setup",
-			"internal_server_error", "Failed to provision device.", r.URL.Path, nil)
+			"internal_server_error", "Failed to lookup device.", r.URL.Path, nil)
 		return
 	}
 
 	name, _ := h.ensurePlaceholder()
-	msg := "Welcome to go-trmnl!"
-	if !created {
-		msg = "Device already registered."
-	}
 	httpx.WriteJSON(w, http.StatusOK, setupResponse{
 		Status:     http.StatusOK,
 		APIKey:     d.APIKey,
 		FriendlyID: d.FriendlyID,
 		ImageURL:   h.imageURL(name),
 		Filename:   strings.TrimSuffix(name, ".bmp"),
-		Message:    msg,
+		Message:    "Welcome to go-trmnl!",
 	})
 }
 

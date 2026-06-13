@@ -27,7 +27,7 @@ func TestNextScreenRoundRobin(t *testing.T) {
 	}
 
 	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:01", APIKey: "k", FriendlyID: "F1"})
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic"); err != nil {
 		t.Fatal(err)
 	}
 

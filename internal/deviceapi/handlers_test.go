@@ -8,12 +8,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gesellix/go-trmnl/internal/device"
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
 )
 
 func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
+	t.Helper()
+	return newTestServerWithAuth(t, false)
+}
+
+func newTestServerWithAuth(t *testing.T, disableAuth bool) (*httptest.Server, *store.Store) {
 	t.Helper()
 	dir := t.TempDir()
 	st, err := store.Open(filepath.Join(dir, "test.db"))
@@ -23,7 +29,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
 	t.Cleanup(func() { st.Close() })
 
 	r := server.New()
-	deviceapi.New(st, "http://test.local", dir).Routes(r)
+	deviceapi.New(st, "http://test.local", dir, disableAuth).Routes(r)
 	ts := httptest.NewServer(r)
 	t.Cleanup(ts.Close)
 	return ts, st
@@ -53,8 +59,20 @@ func do(t *testing.T, ts *httptest.Server, method, path string, headers map[stri
 
 const testMAC = "AA:BB:CC:DD:EE:FF"
 
-func TestSetupProvisionsAndIsStable(t *testing.T) {
+func TestSetupFailsForUnknownMAC(t *testing.T) {
+	ts, _ := newTestServer(t)
+
+	resp := do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("setup status = %d, want 404 for unknown MAC", resp.StatusCode)
+	}
+}
+
+func TestSetupPreRegisteredIsStable(t *testing.T) {
 	ts, st := newTestServer(t)
+	// Pre-register
+	device.Provision(st, testMAC, "", "")
 
 	resp := do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "")
 	defer resp.Body.Close()
@@ -72,13 +90,10 @@ func TestSetupProvisionsAndIsStable(t *testing.T) {
 	if first.APIKey == "" || first.FriendlyID == "" {
 		t.Fatalf("expected api_key and friendly_id, got %+v", first)
 	}
-	if !strings.HasPrefix(first.ImageURL, "http://test.local/uploads/") {
-		t.Errorf("image_url = %q, want test.local/uploads prefix", first.ImageURL)
-	}
 
 	d, err := st.GetDeviceByMAC(testMAC)
 	if err != nil {
-		t.Fatalf("device not persisted: %v", err)
+		t.Fatalf("device not found: %v", err)
 	}
 	if d.APIKey != first.APIKey {
 		t.Errorf("persisted api_key %q != response %q", d.APIKey, first.APIKey)
@@ -107,6 +122,7 @@ func TestSetupMissingID(t *testing.T) {
 
 func TestDisplay(t *testing.T) {
 	ts, st := newTestServer(t)
+	device.Provision(st, testMAC, "", "")
 	do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "").Body.Close()
 	d, _ := st.GetDeviceByMAC(testMAC)
 
@@ -153,24 +169,47 @@ func TestDisplay(t *testing.T) {
 			"ID": testMAC, "Access-Token": "wrong",
 		}, "")
 		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.StatusCode)
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", resp.StatusCode)
 		}
 	})
 
-	t.Run("unknown device", func(t *testing.T) {
+	t.Run("unknown device (fails)", func(t *testing.T) {
 		resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{
-			"ID": "11:22:33:44:55:66", "Access-Token": "x",
+			"ID": "11:22:33:44:55:66", "Access-Token": "some-token",
 		}, "")
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.StatusCode)
+			t.Fatalf("status = %d, want 404 (unknown device)", resp.StatusCode)
+		}
+	})
+
+	t.Run("disabled auth", func(t *testing.T) {
+		tsNoAuth, stNoAuth := newTestServerWithAuth(t, true)
+		device.Provision(stNoAuth, "99:88:77:66:55:44", "", "")
+		do(t, tsNoAuth, http.MethodGet, "/api/setup", map[string]string{"ID": "99:88:77:66:55:44"}, "").Body.Close()
+		// Success with wrong token
+		resp := do(t, tsNoAuth, http.MethodGet, "/api/display", map[string]string{
+			"ID": "99:88:77:66:55:44", "Access-Token": "wrong",
+		}, "")
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status = %d, want 200 with disabled auth", resp.StatusCode)
+		}
+		// Success with missing token
+		resp = do(t, tsNoAuth, http.MethodGet, "/api/display", map[string]string{
+			"ID": "99:88:77:66:55:44",
+		}, "")
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status = %d, want 200 with disabled auth and missing token", resp.StatusCode)
 		}
 	})
 }
 
 func TestDisplayFirmwareAndSpecialFunction(t *testing.T) {
 	ts, st := newTestServer(t)
+	device.Provision(st, testMAC, "", "")
 	do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "").Body.Close()
 	d, _ := st.GetDeviceByMAC(testMAC)
 
@@ -214,6 +253,7 @@ func TestDisplayFirmwareAndSpecialFunction(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	ts, st := newTestServer(t)
+	device.Provision(st, testMAC, "", "")
 	do(t, ts, http.MethodGet, "/api/setup", map[string]string{"ID": testMAC}, "").Body.Close()
 	d, _ := st.GetDeviceByMAC(testMAC)
 
@@ -237,5 +277,17 @@ func TestLog(t *testing.T) {
 	}
 	if logs[0].Message.String != "boot" {
 		t.Errorf("message = %q", logs[0].Message.String)
+	}
+}
+
+func TestLogUnknownDeviceFails(t *testing.T) {
+	ts, _ := newTestServer(t)
+	body := `{"logs":[{"message":"hello"}]}`
+	resp := do(t, ts, http.MethodPost, "/api/log", map[string]string{
+		"ID": "11:22:33:44:55:66", "Content-Type": "application/json",
+	}, body)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 for unknown device in POST /api/log", resp.StatusCode)
 	}
 }

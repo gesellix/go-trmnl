@@ -30,9 +30,16 @@ func (h *Handler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	if mode == "" {
 		mode = "floyd_steinberg"
 	}
+	fontSans, _, _ := h.store.GetSetting("font_sans")
+	fontMono, _, _ := h.store.GetSetting("font_mono")
+	fontTitle, _, _ := h.store.GetSetting("font_title")
+
 	h.render(w, "settings", map[string]any{
 		"Nav":        "settings",
 		"DitherMode": mode,
+		"FontSans":   fontSans,
+		"FontMono":   fontMono,
+		"FontTitle":  fontTitle,
 		"BaseURL":    h.baseURL,
 	})
 }
@@ -45,5 +52,9 @@ func (h *Handler) SettingsSave(w http.ResponseWriter, r *http.Request) {
 		mode = "threshold"
 	}
 	_ = h.store.SetSetting("dither_mode", mode)
+	_ = h.store.SetSetting("font_sans", r.FormValue("font_sans"))
+	_ = h.store.SetSetting("font_mono", r.FormValue("font_mono"))
+	_ = h.store.SetSetting("font_title", r.FormValue("font_title"))
+
 	http.Redirect(w, r, "/admin/settings", http.StatusFound)
 }

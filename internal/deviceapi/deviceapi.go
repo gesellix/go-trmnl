@@ -25,11 +25,12 @@ const placeholderName = "placeholder.bmp"
 
 // Handler bundles the dependencies of the device endpoints.
 type Handler struct {
-	store      *store.Store
-	baseURL    string
-	uploadsDir string
-	assetsDir  string
-	renderer   *render.Renderer
+	store       *store.Store
+	baseURL     string
+	uploadsDir  string
+	assetsDir   string
+	renderer    *render.Renderer
+	disableAuth bool
 
 	placeholderOnce sync.Once
 	placeholderErr  error
@@ -38,13 +39,14 @@ type Handler struct {
 // New creates a device API handler. baseURL is the public URL prefix used to
 // build image URLs; uploadsDir is where rendered images live and are served
 // from at /uploads.
-func New(st *store.Store, baseURL, uploadsDir string) *Handler {
+func New(st *store.Store, baseURL, uploadsDir string, disableAuth bool) *Handler {
 	return &Handler{
-		store:      st,
-		baseURL:    baseURL,
-		uploadsDir: uploadsDir,
-		assetsDir:  filepath.Join(uploadsDir, "assets"),
-		renderer:   render.NewRenderer(uploadsDir),
+		store:       st,
+		baseURL:     baseURL,
+		uploadsDir:  uploadsDir,
+		assetsDir:   filepath.Join(uploadsDir, "assets"),
+		renderer:    render.NewRenderer(uploadsDir),
+		disableAuth: disableAuth,
 	}
 }
 

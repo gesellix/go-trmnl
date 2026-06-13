@@ -49,30 +49,30 @@ func codeInfo(code int) (category, string) {
 	}
 }
 
-func setFace(dc *gg.Context, size float64, bold bool) {
-	if f, err := plugins.Face(size, bold); err == nil {
+func setFace(dc *gg.Context, fs *plugins.FontSet, size float64, style plugins.FontStyle) {
+	if f, err := fs.Face(size, style); err == nil {
 		dc.SetFontFace(f)
 	}
 }
 
 // drawCurrent draws the top section: big icon + temperature, condition, and a
 // right-hand info column (feels-like, humidity, wind, sun times).
-func drawCurrent(dc *gg.Context, d Data, w int) {
+func drawCurrent(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 	cat, _ := codeInfo(d.Code)
 	fw := float64(w)
 
 	drawIcon(dc, cat, 120, 150, 80)
 
 	dc.SetRGB(0, 0, 0)
-	setFace(dc, 120, true)
+	setFace(dc, fs, 120, plugins.StyleTitle)
 	dc.DrawStringAnchored(fmt.Sprintf("%.0f°", d.Temp), 215, 140, 0, 0.5)
 
-	setFace(dc, 34, false)
+	setFace(dc, fs, 34, plugins.StyleSans)
 	dc.DrawStringAnchored(d.CondLabel, 40, 235, 0, 0.5)
 
 	// Right-hand info column, right-aligned.
 	rx := fw - 40
-	setFace(dc, 26, false)
+	setFace(dc, fs, 26, plugins.StyleSans)
 	dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), rx, 60, 1, 0.5)
 	dc.DrawStringAnchored(fmt.Sprintf("Humidity %d%%", d.Humidity), rx, 105, 1, 0.5)
 	dc.DrawStringAnchored(fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), rx, 150, 1, 0.5)
@@ -82,7 +82,7 @@ func drawCurrent(dc *gg.Context, d Data, w int) {
 }
 
 // drawForecast draws the Today/Tomorrow rows beneath a divider.
-func drawForecast(dc *gg.Context, d Data, w int) {
+func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 	fw := float64(w)
 	dc.SetRGB(0, 0, 0)
 	dc.SetLineWidth(2)
@@ -94,12 +94,12 @@ func drawForecast(dc *gg.Context, d Data, w int) {
 		cat, cond := codeInfo(day.Code)
 		drawIcon(dc, cat, 70, y-6, 30)
 
-		setFace(dc, 28, true)
+		setFace(dc, fs, 28, plugins.StyleTitle)
 		dc.DrawStringAnchored(day.Heading, 115, y-14, 0, 0.5)
-		setFace(dc, 22, false)
+		setFace(dc, fs, 22, plugins.StyleSans)
 		dc.DrawStringAnchored(cond, 115, y+16, 0, 0.5)
 
-		setFace(dc, 24, false)
+		setFace(dc, fs, 24, plugins.StyleSans)
 		dc.DrawStringAnchored(fmt.Sprintf("UV %d", day.UV), 380, y, 0, 0.5)
 		dc.DrawStringAnchored(fmt.Sprintf("%d%% precip", day.PrecipPct), 480, y, 0, 0.5)
 		dc.DrawStringAnchored(fmt.Sprintf("L %.0f°  H %.0f°", day.Lo, day.Hi), 640, y, 0, 0.5)
@@ -110,13 +110,13 @@ func drawForecast(dc *gg.Context, d Data, w int) {
 
 // drawLabel draws the footer: a left label and the place (with no time, which
 // the device does not provide here) on the right.
-func drawLabel(dc *gg.Context, d Data, w, h int) {
+func drawLabel(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	text := d.Label
 	if text == "" {
 		text = "Weather"
 	}
 	dc.SetRGB(0, 0, 0)
-	setFace(dc, 18, false)
+	setFace(dc, fs, 18, plugins.StyleSans)
 	dc.DrawStringAnchored(text, 40, float64(h)-20, 0, 0.5)
 	if d.Place != "" {
 		dc.DrawStringAnchored(d.Place, float64(w)-40, float64(h)-20, 1, 0.5)

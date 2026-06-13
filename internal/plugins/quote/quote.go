@@ -115,6 +115,6 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	dc.SetRGB(1, 1, 1)
 	dc.Clear()
 	dc.SetRGB(0, 0, 0)
-	drawQuote(dc, d, in.Width, in.Height)
+	drawQuote(dc, in.Fonts, d, in.Width, in.Height)
 	return img, nil
 }

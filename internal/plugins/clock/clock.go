@@ -74,16 +74,16 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	cx, cy := float64(in.Width)/2, float64(in.Height)/2
 
 	if d.Label != "" {
-		if f, err := plugins.Face(36, false); err == nil {
+		if f, err := in.Fonts.Face(36, plugins.StyleSans); err == nil {
 			dc.SetFontFace(f)
 			dc.DrawStringAnchored(d.Label, cx, cy-150, 0.5, 0.5)
 		}
 	}
-	if f, err := plugins.Face(140, true); err == nil {
+	if f, err := in.Fonts.Face(140, plugins.StyleTitle); err == nil {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(d.Time, cx, cy, 0.5, 0.5)
 	}
-	if f, err := plugins.Face(44, false); err == nil {
+	if f, err := in.Fonts.Face(44, plugins.StyleSans); err == nil {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(d.Date, cx, cy+120, 0.5, 0.5)
 	}

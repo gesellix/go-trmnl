@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/gesellix/go-trmnl/internal/plugins"
 	"github.com/gesellix/go-trmnl/internal/screens"
+	"github.com/gesellix/go-trmnl/internal/store"
 )
 
 // ScreensList shows all screens and the create form.
@@ -89,6 +91,7 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 	if sc.DitherMode.Valid {
 		dither = sc.DitherMode.String
 	}
+	devices, _ := h.store.ListDevices()
 	data := map[string]any{
 		"Nav":              "screens",
 		"Screen":           sc,
@@ -98,6 +101,7 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 		"DitherMode":       dither,
 		"GlobalDither":     globalDither,
 		"BaseURL":          h.baseURL,
+		"Devices":          devices,
 	}
 	if pluginType == "familycalendar" {
 		h.addFamilyCalendarSettings(data, sc.SettingsJSON)
@@ -115,6 +119,11 @@ func (h *Handler) addFamilyCalendarSettings(data map[string]any, settingsJSON st
 		MaxEvents int     `json:"max_events"`
 		Label     string  `json:"label"`
 		Use24h    bool    `json:"use_24h"`
+
+		Location  string  `json:"location"`
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+		Units     string  `json:"units"`
 	}
 	_ = json.Unmarshal([]byte(settingsJSON), &fc)
 	selected := make(map[int64]bool, len(fc.Accounts))
@@ -148,6 +157,11 @@ func (h *Handler) addFamilyCalendarSettings(data map[string]any, settingsJSON st
 	data["FCMaxEvents"] = maxEvents
 	data["FCLabel"] = fc.Label
 	data["FCUse24h"] = fc.Use24h
+
+	data["FCLocation"] = fc.Location
+	data["FCLatitude"] = fc.Latitude
+	data["FCLongitude"] = fc.Longitude
+	data["FCUnits"] = fc.Units
 }
 
 // ScreenUpdate saves a screen's name and settings JSON.
@@ -198,7 +212,11 @@ func (h *Handler) ScreenPreview(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, rerr := screens.Render(r.Context(), h.store, h.renderer, h.assetsDir, nil, sc, h.ditherModeFor(sc)); rerr != nil {
+	var d *store.Device
+	if devID, ok := parseInt64(r.FormValue("device_id")); ok {
+		d, _ = h.store.GetDeviceByID(devID)
+	}
+	if _, rerr := screens.Render(r.Context(), h.store, h.renderer, h.assetsDir, d, sc, h.ditherModeFor(sc)); rerr != nil {
 		http.Error(w, "render failed: "+rerr.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -304,6 +322,18 @@ func familyCalendarSettings(r *http.Request) string {
 	}
 	if r.FormValue("use_24h") != "" {
 		m["use_24h"] = true
+	}
+	if v := r.FormValue("location"); v != "" {
+		m["location"] = v
+	}
+	if v, err := strconv.ParseFloat(r.FormValue("latitude"), 64); err == nil && v != 0 {
+		m["latitude"] = v
+	}
+	if v, err := strconv.ParseFloat(r.FormValue("longitude"), 64); err == nil && v != 0 {
+		m["longitude"] = v
+	}
+	if v := r.FormValue("units"); v != "" {
+		m["units"] = v
 	}
 	b, err := json.Marshal(m)
 	if err != nil {

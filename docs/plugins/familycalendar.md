@@ -1,50 +1,59 @@
-# Family Calendar plugin
+# Family Calendar Plugin
 
-Type: `familycalendar`. Shows the family's upcoming events as an agenda grouped
-by day, merged from one or more **calendar accounts**. Events that appear on
-several accounts (a shared invite both parents accepted) are deduplicated into a
-single entry that shows every account's marker.
+Type: `familycalendar`. Displays upcoming family events as an agenda grouped by days, merged from one or more **calendar accounts**. Additionally, weather information can be displayed in a sidebar. Events appearing in multiple accounts (e.g., a shared invitation accepted by both parents) are merged into a single entry showing the markers of all involved accounts.
 
 [← All plugins](../PLUGINS.md)
 
-## How it is organized
+## Organization
 
-Unlike other plugins, the calendar's credentials are **not** stored per screen.
-You configure **calendar accounts** once under **Admin → Calendar** (each with a
-short marker badge, e.g. `M` for Mom). Calendar screens then just pick which
-accounts to show and how. A background job syncs each account into a local
-cache on its own schedule; screens render from that cache, so they stay fast.
+Instead of storing credentials per screen, **calendar accounts** are configured once under **Admin → Calendar** (each with a short marker, e.g., `M` for Mom). Calendar screens then simply select which accounts should be displayed. A background process synchronizes each account regularly into a local cache; the screens render from this cache, making them very fast.
 
-Supported account providers:
+Supported providers:
 
 - **Google** (OAuth2) — see [Setting up Google](#setting-up-google).
 - **Apple iCloud / CalDAV** (app-specific password) — see
   [Setting up Apple and CalDAV](#setting-up-apple-and-caldav).
 
-You can mix several accounts of either type (e.g. one Google account per parent
-and an iCloud account for a child).
+You can mix different accounts (e.g., one Google account per parent and an iCloud account for a child).
+
+## Layout
+
+The plugin uses a two-column layout:
+- **Left:** The event overview (agenda).
+- **Right:** Weather information (current temperature, weather icon, and a forecast for tomorrow), if coordinates are configured.
+
+A legend of the person markers and the time of the last update are displayed at the bottom.
 
 ## Settings
 
-| Key          | Type    | Default | Notes                                              |
-|--------------|---------|---------|----------------------------------------------------|
-| `accounts`   | array   | (all)   | Account IDs to include; empty/omitted means all    |
-| `days`       | number  | `14`    | How many days ahead to show                        |
-| `max_events` | number  | `30`    | Cap on the number of events displayed              |
-| `label`      | string  | (empty) | Optional title shown at the top                    |
-| `use_24h`    | boolean | `false` | 24-hour times (`15:04`) instead of `3:04 PM`       |
+| Key          | Type    | Default  | Notes                                           |
+|--------------|---------|----------|-------------------------------------------------|
+| `accounts`   | array   | (all)    | Account IDs to include; empty/omitted means all |
+| `days`       | number  | `14`     | How many days in advance to display             |
+| `max_events` | number  | `30`     | Upper limit for the number of displayed events  |
+| `label`      | string  | (empty)  | Optional title displayed at the top             |
+| `use_24h`    | boolean | `false`  | 24-hour format (`15:04`) instead of `3:04 PM`   |
+| `location`   | string  | (empty)  | Location name for weather (e.g., "London")      |
+| `latitude`   | number  | `0`      | Latitude for weather data                       |
+| `longitude`  | number  | `0`      | Longitude for weather data                      |
+| `units`      | string  | `metric` | `metric` (°C, km/h) or `imperial` (°F, mph)     |
 
 ```json
-{ "label": "Family", "accounts": [1, 2], "days": 14, "use_24h": true }
+{
+  "label": "Family",
+  "accounts": [1, 2],
+  "days": 14,
+  "use_24h": true,
+  "location": "London",
+  "latitude": 51.5074,
+  "longitude": -0.1278,
+  "units": "metric"
+}
 ```
 
-In the admin UI you don't edit this JSON directly: the screen editor shows a
-checklist of your calendar accounts (by name) plus fields for the options above.
-Leave all accounts unchecked to include every account.
+In the admin interface, you don't need to edit this JSON manually: The editor shows a checklist of your calendar accounts and fields for the options mentioned above. If no account is selected, all are included.
 
-Cache TTL hint: ~15 minutes (how often a device re-fetches the rendered screen).
-The underlying calendar data is refreshed per account on its own interval
-(default 12h, set per account in **Admin → Calendar**).
+Cache notice: approx. 15 minutes (interval at which the device reloads the rendered image). The underlying calendar data is updated per account at its own interval (default 12h, adjustable under **Admin → Calendar**).
 
 ## Setting up Google
 
@@ -147,7 +156,7 @@ the account needs two-factor authentication enabled.
 No global configuration is needed for CalDAV. App-specific passwords are stored
 the same way as Google tokens (encrypted when `TRMNL_SECRET_KEY` is set).
 
-## How to test
+## Testing
 
 The plugin reads from the local event cache, so pass a database path to the
 render CLI after you have configured and synced at least one account:

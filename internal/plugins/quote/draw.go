@@ -5,8 +5,8 @@ import (
 	"github.com/gesellix/go-trmnl/internal/plugins"
 )
 
-func setFace(dc *gg.Context, size float64, bold bool) {
-	if f, err := plugins.Face(size, bold); err == nil {
+func setFace(dc *gg.Context, fs *plugins.FontSet, size float64, style plugins.FontStyle) {
+	if f, err := fs.Face(size, style); err == nil {
 		dc.SetFontFace(f)
 	}
 }
@@ -25,7 +25,7 @@ func quoteSize(n int) float64 {
 	}
 }
 
-func drawQuote(dc *gg.Context, d Data, w, h int) {
+func drawQuote(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	fw, fh := float64(w), float64(h)
 	cx := fw / 2
 
@@ -35,7 +35,7 @@ func drawQuote(dc *gg.Context, d Data, w, h int) {
 	}
 
 	size := quoteSize(len(d.Text))
-	setFace(dc, size, true)
+	setFace(dc, fs, size, plugins.StyleTitle)
 	width := fw - 160
 	lines := dc.WordWrap(text, width)
 
@@ -62,12 +62,12 @@ func drawQuote(dc *gg.Context, d Data, w, h int) {
 	}
 
 	if d.Author != "" {
-		setFace(dc, 28, false)
+		setFace(dc, fs, 28, plugins.StyleSans)
 		dc.DrawStringAnchored("— "+d.Author, cx, y+24, 0.5, 0.5)
 	}
 
 	// Footer: label on the left, provider attribution on the right.
-	setFace(dc, 18, false)
+	setFace(dc, fs, 18, plugins.StyleSans)
 	if d.Label != "" {
 		dc.DrawStringAnchored(d.Label, 40, fh-20, 0, 0.5)
 	}

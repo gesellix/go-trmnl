@@ -2,6 +2,8 @@ package admin
 
 import (
 	"net/http"
+
+	"github.com/gesellix/go-trmnl/internal/device"
 )
 
 // DevicesList shows all registered devices.
@@ -12,6 +14,22 @@ func (h *Handler) DevicesList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.render(w, "devices", map[string]any{"Nav": "devices", "Devices": devices})
+}
+
+// DeviceCreate adds a new device by MAC.
+func (h *Handler) DeviceCreate(w http.ResponseWriter, r *http.Request) {
+	mac := r.FormValue("mac")
+	if mac == "" {
+		http.Error(w, "mac is required", http.StatusBadRequest)
+		return
+	}
+	// Use the existing Provision logic to generate credentials.
+	d, _, err := device.Provision(h.store, mac, "", "")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/admin/devices/"+i64(d.ID), http.StatusFound)
 }
 
 // DeviceDetail shows one device with its telemetry and assignment form.
@@ -61,7 +79,8 @@ func (h *Handler) DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		refresh = 60
 	}
 	playlistID, _ := parseInt64(r.FormValue("playlist_id"))
-	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID)); err != nil {
+	bundle := r.FormValue("font_bundle")
+	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID), bundle); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
