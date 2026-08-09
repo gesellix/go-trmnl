@@ -1,6 +1,6 @@
 module github.com/gesellix/go-trmnl
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
