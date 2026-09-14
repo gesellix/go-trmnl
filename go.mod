@@ -7,9 +7,9 @@ require (
 	github.com/emersion/go-webdav v0.7.0
 	github.com/fogleman/gg v1.3.0
 	github.com/go-chi/chi/v5 v5.3.1
-	golang.org/x/crypto v0.55.0
-	golang.org/x/image v0.45.0
-	golang.org/x/oauth2 v0.36.0
+	golang.org/x/crypto v0.57.0
+	golang.org/x/image v0.46.0
+	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.292.0
 	modernc.org/sqlite v1.56.0
 )
@@ -37,9 +37,9 @@ require (
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/grpc v1.83.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
