@@ -64,6 +64,17 @@ jobs:
             --config=p/golang
         continue-on-error: true
 
+      # Semgrep keeps findings silenced by `// nosemgrep` in the SARIF (marked
+      # with `suppressions`), and code scanning still opens alerts for them.
+      # Drop them so in-source suppressions actually take effect.
+      - name: Drop nosemgrep-suppressed findings
+        if: always() && hashFiles('semgrep.sarif') != ''
+        run: |
+          jq '.runs[].results |= map(select((.suppressions // []) | length == 0))' \
+            semgrep.sarif > semgrep.filtered.sarif
+          mv semgrep.filtered.sarif semgrep.sarif
+        continue-on-error: true
+
       - name: Upload Semgrep SARIF
         if: always() && hashFiles('semgrep.sarif') != ''
         uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
