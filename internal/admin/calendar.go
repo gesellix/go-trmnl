@@ -246,7 +246,9 @@ func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		_ = h.cal.SyncAccount(r.Context(), accountID)
-		http.Redirect(w, r, "/admin/calendar/"+i64(accountID), http.StatusFound)
+		// Not an open redirect: accountID was parsed to a positive int64, so the
+		// target is always a same-origin path ending in decimal digits.
+		http.Redirect(w, r, "/admin/calendar/"+i64(accountID), http.StatusFound) // nosemgrep: go.lang.security.injection.open-redirect.open-redirect
 		return
 	}
 	// Default the marker to the first letter of the email.
