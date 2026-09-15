@@ -31,6 +31,13 @@
 API enabled, type "Web application") and register this redirect URI:
 <code>{{.RedirectURI}}</code>. You can add more than one client (e.g. one per
 project).</p>
+{{if not .IsHTTPS}}
+<p class="muted">Google only allows publishing an OAuth app ("In production", no
+7-day token expiry) when all redirect URIs use HTTPS.
+{{if .HTTPSURL}}Open this page via <a href="{{.HTTPSURL}}/admin/calendar">{{.HTTPSURL}}</a>
+to see the HTTPS redirect URI.{{else}}Enable the HTTPS listener with
+<code>-https-listen</code> (see Settings).{{end}}</p>
+{{end}}
 
 {{if .OAuthClients}}
 <table class="list">

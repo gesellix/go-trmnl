@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,6 +29,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/secret"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
+	"github.com/gesellix/go-trmnl/internal/tlscert"
 	"github.com/gesellix/go-trmnl/internal/uploads"
 
 	// Register built-in screen plugins.
@@ -98,10 +101,11 @@ func run() error {
 	if cfg.AdminPassword == "" {
 		log.Printf("WARNING: admin UI authentication is disabled (set -admin-password or TRMNL_ADMIN_PASSWORD)")
 	}
+	tlsSrc := newTLSSource(cfg)
 	admin.New(st, cfg.PublicBaseURL, cfg.UploadsDir, admin.Auth{
 		User:     cfg.AdminUser,
 		Password: cfg.AdminPassword,
-	}, cal).Routes(r)
+	}, cal).WithHTTPS(cfg.HTTPSListenAddr, tlsSrc).Routes(r)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -112,7 +116,37 @@ func run() error {
 	go runCalendarSync(ctx, cal)
 
 	log.Printf("trmnld %s listening on %s (public base URL %s)", version, cfg.ListenAddr, cfg.PublicBaseURL)
-	return server.Run(ctx, cfg.ListenAddr, r)
+	listeners := []server.Listener{{Addr: cfg.ListenAddr}}
+	if tlsSrc != nil {
+		tlsCfg, terr := tlsSrc.TLSConfig()
+		if terr != nil {
+			return fmt.Errorf("https: %w", terr)
+		}
+		listeners = append(listeners, server.Listener{Addr: cfg.HTTPSListenAddr, TLS: tlsCfg})
+		if tlsSrc.LocalCA() {
+			log.Printf("trmnld HTTPS listening on %s (local CA in %s, certificate for %s)",
+				cfg.HTTPSListenAddr, cfg.TLSDir(), strings.Join(tlsSrc.Hosts(), ", "))
+		} else {
+			log.Printf("trmnld HTTPS listening on %s (certificate %s)", cfg.HTTPSListenAddr, cfg.TLSCertFile)
+		}
+	}
+	return server.Run(ctx, r, listeners...)
+}
+
+// newTLSSource returns the HTTPS certificate source, or nil when HTTPS is off.
+func newTLSSource(cfg *config.Config) *tlscert.Source {
+	switch {
+	case cfg.HTTPSListenAddr == "":
+		return nil
+	case cfg.TLSCertFile != "":
+		return tlscert.NewFromFiles(cfg.TLSCertFile, cfg.TLSKeyFile)
+	default:
+		host := ""
+		if u, err := url.Parse(cfg.PublicBaseURL); err == nil {
+			host = u.Hostname()
+		}
+		return tlscert.NewLocalCA(cfg.TLSDir(), append(tlscert.DefaultHosts(host), cfg.TLSHosts...))
+	}
 }
 
 // resolveSecretBox builds the at-rest encryption box. Encryption is on by

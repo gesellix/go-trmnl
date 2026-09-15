@@ -143,3 +143,40 @@ func unsetEnv(t *testing.T, keys ...string) {
 		_ = os.Unsetenv(k)
 	}
 }
+
+func TestHTTPSSettings(t *testing.T) {
+	unsetEnv(t, "TRMNL_HTTPS_LISTEN", "TRMNL_TLS_HOSTS", "TRMNL_TLS_CERT", "TRMNL_TLS_KEY")
+	base := []string{"-base-url", "http://192.168.1.10:8080", "-data-dir", "/tmp/x"}
+
+	c, err := config.Load(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.HTTPSListenAddr != "" || c.TLSHosts != nil {
+		t.Errorf("HTTPS should be off by default: %+v", c)
+	}
+
+	t.Setenv("TRMNL_HTTPS_LISTEN", ":9443")
+	t.Setenv("TRMNL_TLS_HOSTS", " trmnl.fritz.box, ,pi.home.arpa ")
+	c, err = config.Load(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.HTTPSListenAddr != ":9443" || len(c.TLSHosts) != 2 || c.TLSHosts[1] != "pi.home.arpa" {
+		t.Errorf("env not applied: %q %q", c.HTTPSListenAddr, c.TLSHosts)
+	}
+	if c.TLSDir() != filepath.Join("/tmp/x", "tls") {
+		t.Errorf("TLSDir = %q", c.TLSDir())
+	}
+
+	for name, args := range map[string][]string{
+		"cert without key":       {"-tls-cert", "c.pem"},
+		"invalid listen address": {"-https-listen", "9443"},
+		"hosts without listener": {"-https-listen", "", "-tls-hosts", "a.example.com"},
+		"cert without listener":  {"-https-listen", "", "-tls-hosts", "", "-tls-cert", "c.pem", "-tls-key", "k.pem"},
+	} {
+		if _, err := config.Load(append(append([]string{}, base...), args...)); err == nil {
+			t.Errorf("%s: expected an error", name)
+		}
+	}
+}

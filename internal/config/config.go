@@ -19,6 +19,17 @@ import (
 type Config struct {
 	// ListenAddr is the TCP address the HTTP server binds to, e.g. ":8080".
 	ListenAddr string
+	// HTTPSListenAddr is the TCP address of the optional HTTPS listener, e.g.
+	// ":8443". Empty disables HTTPS. The listener serves the same routes as the
+	// HTTP one; devices keep using PublicBaseURL.
+	HTTPSListenAddr string
+	// TLSHosts are extra DNS names or IPs for the certificate issued by the
+	// local CA, in addition to this host's name, the base URL host and loopback.
+	TLSHosts []string
+	// TLSCertFile and TLSKeyFile select a user-supplied certificate instead of
+	// the local CA. Both or neither must be set.
+	TLSCertFile string
+	TLSKeyFile  string
 	// PublicBaseURL is the absolute URL the device uses to reach this server.
 	// It must be LAN-reachable by the device (not a loopback address), because
 	// the device fetches rendered images from <PublicBaseURL>/uploads/...
@@ -56,6 +67,10 @@ func Load(args []string) (*Config, error) {
 	fs := flag.NewFlagSet("trmnld", flag.ContinueOnError)
 
 	listen := fs.String("listen", env("TRMNL_LISTEN", ":8080"), "HTTP listen address")
+	httpsListen := fs.String("https-listen", env("TRMNL_HTTPS_LISTEN", ""), "HTTPS listen address (e.g. :8443); empty disables HTTPS")
+	tlsHosts := fs.String("tls-hosts", env("TRMNL_TLS_HOSTS", ""), "Comma-separated extra hostnames/IPs for the local CA certificate (e.g. trmnl.fritz.box)")
+	tlsCert := fs.String("tls-cert", env("TRMNL_TLS_CERT", ""), "TLS certificate file (PEM) to use instead of the local CA")
+	tlsKey := fs.String("tls-key", env("TRMNL_TLS_KEY", ""), "TLS private key file (PEM) for -tls-cert")
 	baseURL := fs.String("base-url", env("TRMNL_BASE_URL", ""), "Public base URL reachable by the device (e.g. http://192.168.1.10:8080)")
 	dataDir := fs.String("data-dir", env("TRMNL_DATA_DIR", "./data"), "Data directory for database and uploads")
 	dbPath := fs.String("db", env("TRMNL_DB", ""), "SQLite database path (default <data-dir>/trmnl.db)")
@@ -83,6 +98,10 @@ func Load(args []string) (*Config, error) {
 
 	c := &Config{
 		ListenAddr:        *listen,
+		HTTPSListenAddr:   strings.TrimSpace(*httpsListen),
+		TLSHosts:          splitList(*tlsHosts),
+		TLSCertFile:       *tlsCert,
+		TLSKeyFile:        *tlsKey,
 		PublicBaseURL:     strings.TrimRight(*baseURL, "/"),
 		DataDir:           *dataDir,
 		DBPath:            *dbPath,
@@ -109,7 +128,32 @@ func Load(args []string) (*Config, error) {
 	if u, err := url.Parse(c.PublicBaseURL); err != nil || !u.IsAbs() {
 		return nil, fmt.Errorf("base-url must be an absolute URL, got %q", c.PublicBaseURL)
 	}
+	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
+		return nil, fmt.Errorf("tls-cert and tls-key must be set together")
+	}
+	if c.HTTPSListenAddr == "" && (c.TLSCertFile != "" || len(c.TLSHosts) > 0) {
+		return nil, fmt.Errorf("tls-cert, tls-key and tls-hosts require https-listen")
+	}
+	if c.HTTPSListenAddr != "" {
+		if _, _, err := net.SplitHostPort(c.HTTPSListenAddr); err != nil {
+			return nil, fmt.Errorf("invalid https-listen %q: %w", c.HTTPSListenAddr, err)
+		}
+	}
 	return c, nil
+}
+
+// TLSDir is where the local CA and its server certificate are stored.
+func (c *Config) TLSDir() string { return filepath.Join(c.DataDir, "tls") }
+
+// splitList splits a comma-separated list, trimming blanks and dropping empties.
+func splitList(s string) []string {
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 // EnsureDirs creates the data and uploads directories if they do not exist.

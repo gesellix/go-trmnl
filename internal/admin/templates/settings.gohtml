@@ -28,4 +28,30 @@
   <tr><th>Public base URL</th><td><code>{{.BaseURL}}</code></td></tr>
 </table>
 <p class="muted">The base URL is set at startup with <code>-base-url</code>; the device must be able to reach it on your network.</p>
+
+<h2>HTTPS</h2>
+{{with .HTTPS}}
+<table class="kv">
+  <tr><th>Admin UI</th><td><a href="{{.URL}}/admin/settings">{{.URL}}/admin</a>{{if .Active}} <span class="muted">(this page)</span>{{end}}</td></tr>
+  <tr><th>Listen address</th><td><code>{{.Addr}}</code></td></tr>
+  {{if .LocalCA}}
+  <tr><th>Certificate covers</th><td><code>{{.Hosts}}</code></td></tr>
+  <tr><th>CA fingerprint (SHA-256)</th><td><code>{{.Fingerprint}}</code></td></tr>
+  {{else}}
+  <tr><th>Certificate</th><td>user-supplied (<code>-tls-cert</code>)</td></tr>
+  {{end}}
+</table>
+{{if .LocalCA}}
+<p><a href="/admin/tls/ca.crt">Download CA certificate</a></p>
+<p class="muted">The certificate is issued by a CA generated for this server. Install
+the CA certificate as trusted on each device you open the admin UI from (macOS:
+Keychain Access, set it to "Always Trust"; Windows: "Trusted Root Certification
+Authorities"; Firefox uses its own certificate store). Compare the fingerprint
+above before trusting it. Add further hostnames with <code>-tls-hosts</code>.</p>
+{{end}}
+{{else}}
+<p class="muted">HTTPS is disabled. Start the server with <code>-https-listen :8443</code>
+(or <code>TRMNL_HTTPS_LISTEN</code>) to serve the admin UI over HTTPS, which Google
+OAuth requires for apps in production.</p>
+{{end}}
 {{end}}

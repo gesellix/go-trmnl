@@ -81,9 +81,13 @@ the classic **APIs & Services** paths are noted in parentheses where they differ
      **Testing** status after **7 days**. Syncing then fails with
      `auth: cannot fetch token: 400 ... "invalid_grant"` and the account needs
      to be [reconnected](#reconnecting-a-google-account). To avoid the weekly
-     reconnect, set **Audience → Publishing status** to **In production**. A
-     personal app using only `calendar.readonly` works without verification;
-     users just see an "unverified app" warning on the consent screen.
+     reconnect, set **Audience → Publishing status** to **In production**.
+     Google only allows that when **every redirect URI of the project's OAuth
+     clients uses HTTPS**, so it requires the
+     [HTTPS listener](../GETTING-STARTED.md#https) (or a TLS-terminating reverse
+     proxy). A personal app using only `calendar.readonly` then works without
+     verification; users just see an "unverified app" warning on the consent
+     screen.
 4. Add the read-only scope under **Google Auth Platform → Data access → Add or
    remove scopes** (classic: the **Scopes** step of the consent screen): search
    the Google Calendar API and select `.../auth/calendar.readonly`. (go-trmnl
@@ -93,18 +97,27 @@ the classic **APIs & Services** paths are noted in parentheses where they differ
    (classic: **APIs & Services → Credentials → Create credentials → OAuth client
    ID**):
    - Application type **Web application**.
-   - Under **Authorized redirect URIs**, add exactly:
+   - Under **Authorized redirect URIs**, add exactly the URI shown in
+     **Admin → Calendar** when you open it with the hostname you will use for
+     the consent flow, for example:
 
      ```
-     http://<host>:8080/admin/oauth/google/callback
+     https://trmnl.fritz.box:8443/admin/oauth/google/callback   (HTTPS listener)
+     http://trmnl.fritz.box:8080/admin/oauth/google/callback    (Testing status only)
      ```
 
-     where `<host>` is the host you will open the admin UI with. **Google
-     rejects raw private IP addresses** (e.g. `http://192.168.1.10:8080/...`
-     fails with "device_id and device_name are required for private IP"), so
-     use a DNS or mDNS hostname, e.g.
-     `http://trmnl.local:8080/admin/oauth/google/callback`. It must match
-     character-for-character, including the scheme and port.
+     It must match character-for-character, including the scheme and port.
+     Google's [redirect URI rules](https://developers.google.com/identity/protocols/oauth2/web-server#uri-validation)
+     apply:
+     - **No raw IP addresses** (e.g. `http://192.168.1.10:8080/...` fails with
+       "device_id and device_name are required for private IP"); `localhost`
+       is the only exception.
+     - The hostname's top-level domain must be on the
+       [Public Suffix List](https://publicsuffix.org/). Router and home names
+       such as `*.fritz.box` or `*.home.arpa` qualify; `*.local`, `*.lan` and
+       `*.internal` do not. The name only has to resolve in your browser;
+       Google never contacts it.
+     - Plain `http://` is only accepted while the app is in **Testing** status.
 6. Copy the generated **Client ID** and **Client secret**.
 
 ### 2. Add the OAuth client in go-trmnl
@@ -115,10 +128,10 @@ the database, encrypted at rest when a key is configured (see
 [`-secret-key`](../GETTING-STARTED.md)). You can add several clients; there are
 no env/CLI variables for them.
 
-> Note: the OAuth redirect URI is derived from the host you use to reach the
-> admin UI, **not** from `-base-url`. So open the admin UI at
-> `http://<host>:8080/admin/calendar` (the same hostname you registered) when
-> adding Google accounts, and the redirect will match. This means `-base-url`
+> Note: the OAuth redirect URI is derived from the scheme and host you use to
+> reach the admin UI, **not** from `-base-url`. So open the admin UI at the
+> URL you registered (e.g. `https://trmnl.fritz.box:8443/admin/calendar`) when
+> adding or reconnecting Google accounts, and the redirect will match. This means `-base-url`
 > can stay your LAN IP for the device's image fetches, while the OAuth flow uses
 > the hostname Google requires. The hostname only needs to resolve in the
 > browser you run the consent flow from.
