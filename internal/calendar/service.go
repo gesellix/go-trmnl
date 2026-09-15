@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gesellix/go-trmnl/internal/secret"
@@ -314,6 +315,9 @@ func (s *Service) runSync(ctx context.Context, acc Account, now time.Time) error
 	msg := ""
 	if err != nil {
 		msg = err.Error()
+		if IsReauthRequired(err) {
+			msg = ReauthErrorPrefix + " (" + msg + ")"
+		}
 	}
 	_ = s.store.SetCalendarAccountSync(acc.ID, now.Unix(), msg)
 	return err
@@ -443,6 +447,38 @@ func (s *Service) CreateGoogleAccount(oauthClientID int64, name, marker string, 
 		return 0, err
 	}
 	return acc.ID, nil
+}
+
+// ReauthorizeGoogleAccount replaces the stored token of an existing Google
+// account after a fresh consent (e.g. when its refresh token expired or was
+// revoked), keeping the calendar selection and other settings. The token must
+// belong to the same Google address the account was created with.
+func (s *Service) ReauthorizeGoogleAccount(id int64, tok *oauth2.Token, email string) error {
+	acc, err := s.Account(id)
+	if err != nil {
+		return err
+	}
+	if acc.Provider != ProviderGoogle {
+		return fmt.Errorf("calendar: account %d is not a Google account", id)
+	}
+	if acc.Config.Email != "" && !strings.EqualFold(acc.Config.Email, email) {
+		return fmt.Errorf("calendar: signed in as %q, but account %d belongs to %q", email, id, acc.Config.Email)
+	}
+	cfg := acc.Config
+	cfg.AccessToken = tok.AccessToken
+	cfg.TokenType = tok.TokenType
+	cfg.Expiry = tok.Expiry
+	if tok.RefreshToken != "" {
+		cfg.RefreshToken = tok.RefreshToken
+	}
+	if cfg.Email == "" {
+		cfg.Email = email
+	}
+	j, err := s.marshalGoogleConfig(cfg)
+	if err != nil {
+		return err
+	}
+	return s.store.SetCalendarAccountConfig(id, j)
 }
 
 // UpdateGoogleAccount saves the editable fields and calendar selection for an

@@ -13,6 +13,7 @@
       <td>{{.Refresh}}</td>
       <td>{{.LastSync}}</td>
       <td>
+        {{if .NeedsReauth}}<form method="get" action="/admin/calendar/google/start" class="inline"><input type="hidden" name="account" value="{{.ID}}"><button type="submit">Reconnect</button></form>{{end}}
         <form method="post" action="/admin/calendar/{{.ID}}/sync" class="inline"><button type="submit">Sync now</button></form>
         <form method="post" action="/admin/calendar/{{.ID}}/delete" class="inline" onsubmit="return confirm('Remove this account?')"><button type="submit" class="danger">Delete</button></form>
       </td>

@@ -45,13 +45,14 @@ func (h *Handler) CalendarList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type row struct {
-		ID       int64
-		Name     string
-		Provider string
-		Marker   string
-		Refresh  string
-		LastSync string
-		Error    string
+		ID          int64
+		Name        string
+		Provider    string
+		Marker      string
+		Refresh     string
+		LastSync    string
+		Error       string
+		NeedsReauth bool
 	}
 	accs, _ := h.cal.Accounts()
 	rows := make([]row, 0, len(accs))
@@ -63,6 +64,7 @@ func (h *Handler) CalendarList(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row{
 			ID: a.ID, Name: a.Name, Provider: string(a.Provider), Marker: a.Marker,
 			Refresh: a.RefreshInterval.String(), LastSync: last, Error: a.LastError,
+			NeedsReauth: a.Provider == calendar.ProviderGoogle && strings.HasPrefix(a.LastError, calendar.ReauthErrorPrefix),
 		})
 	}
 
@@ -130,15 +132,31 @@ func (h *Handler) CalendarOAuthClientDelete(w http.ResponseWriter, r *http.Reque
 }
 
 // CalendarGoogleStart redirects the admin to Google's consent screen for the
-// chosen OAuth client (?client=<id>). The state cookie carries a nonce and the
-// client id so the callback knows which client to exchange against.
+// chosen OAuth client (?client=<id>), or to reconnect an existing Google account
+// (?account=<id>). The state cookie carries a nonce, the client id and the
+// account id (0 for a new account) so the callback knows which client to
+// exchange against and whether to create or update an account.
 func (h *Handler) CalendarGoogleStart(w http.ResponseWriter, r *http.Request) {
 	if h.cal == nil {
 		http.Error(w, "calendar service unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	clientID, err := parseInt64Q(r.URL.Query().Get("client"))
-	if err != nil {
+	// With account=<id>, reconnect an existing Google account (bound to its own
+	// client) instead of adding a new one.
+	var clientID, accountID int64
+	var err error
+	if q := r.URL.Query().Get("account"); q != "" {
+		if accountID, err = parseInt64Q(q); err != nil {
+			http.Error(w, "invalid account", http.StatusBadRequest)
+			return
+		}
+		acc, aerr := h.cal.Account(accountID)
+		if aerr != nil || acc.Provider != calendar.ProviderGoogle {
+			http.NotFound(w, r)
+			return
+		}
+		clientID = acc.Config.OAuthClientID
+	} else if clientID, err = parseInt64Q(r.URL.Query().Get("client")); err != nil {
 		http.Error(w, "missing or invalid client", http.StatusBadRequest)
 		return
 	}
@@ -153,7 +171,7 @@ func (h *Handler) CalendarGoogleStart(w http.ResponseWriter, r *http.Request) {
 	// Secure cookie would not be sent and would break the consent flow.
 	http.SetCookie(w, &http.Cookie{ // nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 		Name:     oauthStateCookie,
-		Value:    nonce + "|" + i64(clientID),
+		Value:    nonce + "|" + i64(clientID) + "|" + i64(accountID),
 		Path:     "/admin",
 		HttpOnly: true,
 		Secure:   requestIsHTTPS(r),
@@ -165,7 +183,8 @@ func (h *Handler) CalendarGoogleStart(w http.ResponseWriter, r *http.Request) {
 
 // CalendarGoogleCallback handles Google's redirect: it validates the state
 // nonce, exchanges the code via the client recorded in the cookie, creates the
-// account, and sends the admin to the picker.
+// account (or replaces the token of the account being reconnected), and sends
+// the admin to the picker.
 func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if h.cal == nil {
 		http.Error(w, "calendar service unavailable", http.StatusServiceUnavailable)
@@ -187,15 +206,23 @@ func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request)
 		MaxAge:   -1,
 	})
 
-	nonce, clientIDStr, ok := strings.Cut(c.Value, "|")
-	if !ok || nonce == "" || nonce != r.URL.Query().Get("state") {
+	// State cookie: nonce|clientID[|accountID], accountID 0 meaning a new account.
+	parts := strings.Split(c.Value, "|")
+	if len(parts) < 2 || len(parts) > 3 || parts[0] == "" || parts[0] != r.URL.Query().Get("state") {
 		http.Error(w, "invalid OAuth state", http.StatusBadRequest)
 		return
 	}
-	clientID, err := parseInt64Q(clientIDStr)
+	clientID, err := parseInt64Q(parts[1])
 	if err != nil {
 		http.Error(w, "invalid OAuth state", http.StatusBadRequest)
 		return
+	}
+	var accountID int64
+	if len(parts) == 3 && parts[2] != "0" {
+		if accountID, err = parseInt64Q(parts[2]); err != nil {
+			http.Error(w, "invalid OAuth state", http.StatusBadRequest)
+			return
+		}
 	}
 
 	if e := r.URL.Query().Get("error"); e != "" {
@@ -211,6 +238,15 @@ func (h *Handler) CalendarGoogleCallback(w http.ResponseWriter, r *http.Request)
 	tok, email, err := h.cal.ExchangeGoogle(r.Context(), clientID, code, oauthRedirectURL(r))
 	if err != nil {
 		http.Error(w, "token exchange failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	if accountID > 0 {
+		if err = h.cal.ReauthorizeGoogleAccount(accountID, tok, email); err != nil {
+			http.Error(w, "could not reconnect account: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		_ = h.cal.SyncAccount(r.Context(), accountID)
+		http.Redirect(w, r, "/admin/calendar/"+i64(accountID), http.StatusFound)
 		return
 	}
 	// Default the marker to the first letter of the email.

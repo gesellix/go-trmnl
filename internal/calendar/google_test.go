@@ -2,9 +2,12 @@ package calendar
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"golang.org/x/oauth2"
 	gcal "google.golang.org/api/calendar/v3"
@@ -81,5 +84,49 @@ func TestGoogleSourceFetchMapsEvents(t *testing.T) {
 
 	if byUID["u-notitle"].Title != "(no title)" {
 		t.Errorf("missing-title fallback = %q", byUID["u-notitle"].Title)
+	}
+}
+
+func TestIsReauthRequired(t *testing.T) {
+	wrapped := fmt.Errorf("events.list: %w", &oauth2.RetrieveError{ErrorCode: "invalid_grant"})
+	if !IsReauthRequired(wrapped) {
+		t.Error("wrapped invalid_grant RetrieveError should require reauth")
+	}
+	if IsReauthRequired(&oauth2.RetrieveError{ErrorCode: "invalid_client"}) {
+		t.Error("invalid_client should not require reauth")
+	}
+	if IsReauthRequired(errors.New("connection refused")) || IsReauthRequired(nil) {
+		t.Error("unrelated errors should not require reauth")
+	}
+}
+
+// TestGoogleSourceFetchInvalidGrant drives the real token refresh against a
+// token endpoint that rejects the refresh token, as Google does for expired or
+// revoked grants, and checks the error survives the API client's wrapping.
+func TestGoogleSourceFetchInvalidGrant(t *testing.T) {
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"Bad Request"}`))
+	}))
+	t.Cleanup(tokenSrv.Close)
+
+	oauth := &GoogleOAuth{cfg: &oauth2.Config{
+		ClientID: "id", ClientSecret: "secret",
+		Endpoint: oauth2.Endpoint{TokenURL: tokenSrv.URL},
+	}}
+	src := &googleSource{
+		acc: Account{ID: 1, Provider: ProviderGoogle, Config: GoogleConfig{
+			RefreshToken: "stale", AccessToken: "old", Expiry: time.Now().Add(-time.Hour),
+		}},
+		deps: sourceDeps{googleOAuthFor: func(int64) (*GoogleOAuth, error) { return oauth, nil }},
+	}
+
+	_, err := src.Fetch(context.Background(), Window{From: time.Now(), To: time.Now().Add(time.Hour)})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !IsReauthRequired(err) {
+		t.Errorf("IsReauthRequired(%v) = false, want true", err)
 	}
 }

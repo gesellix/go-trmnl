@@ -1,6 +1,7 @@
 package admin_test
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -8,10 +9,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gesellix/go-trmnl/internal/admin"
+	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
+	"golang.org/x/oauth2"
 
 	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
 )
@@ -128,5 +132,69 @@ func TestAdminAuth(t *testing.T) {
 	resp3.Body.Close()
 	if resp3.StatusCode != http.StatusOK {
 		t.Fatalf("good-auth status = %d, want 200", resp3.StatusCode)
+	}
+}
+
+func TestAdminGoogleReconnectStart(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(filepath.Join(dir, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	cal := calendar.NewService(st, nil)
+	clientID, err := cal.CreateOAuthClient("family", "cid.apps.googleusercontent.com", "csecret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accID, err := cal.CreateGoogleAccount(clientID, "Mom", "M", &oauth2.Token{RefreshToken: "r"},
+		"mom@example.com", nil, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := server.New()
+	admin.New(st, "http://test.local", dir, admin.Auth{}, cal).Routes(r)
+	ts := httptest.NewServer(r)
+	t.Cleanup(ts.Close)
+	ts.Client().CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+	res, err := ts.Client().Get(ts.URL + "/admin/calendar/google/start?account=" + strconv.FormatInt(accID, 10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusFound || !strings.Contains(res.Header.Get("Location"), "cid.apps.googleusercontent.com") {
+		t.Fatalf("status %d, location %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	var state string
+	for _, c := range res.Cookies() {
+		if c.Name == "trmnl_oauth_state" {
+			state = c.Value
+		}
+	}
+	parts := strings.Split(state, "|")
+	if len(parts) != 3 || parts[1] != strconv.FormatInt(clientID, 10) || parts[2] != strconv.FormatInt(accID, 10) {
+		t.Errorf("state cookie %q, want nonce|%d|%d", state, clientID, accID)
+	}
+
+	// Unknown accounts are rejected.
+	res, err = ts.Client().Get(ts.URL + "/admin/calendar/google/start?account=999")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("unknown account: status %d, want 404", res.StatusCode)
+	}
+
+	// The account page offers the reconnect button.
+	res, err = ts.Client().Get(ts.URL + "/admin/calendar/" + strconv.FormatInt(accID, 10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(body), "Reconnect Google account") {
+		t.Error("account page lacks the reconnect button")
 	}
 }
