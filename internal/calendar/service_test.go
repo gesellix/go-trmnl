@@ -196,3 +196,45 @@ func TestNextWakeClamps(t *testing.T) {
 		t.Errorf("NextWake = %v, want 1m floor", got)
 	}
 }
+
+func TestReauthorizeGoogleAccount(t *testing.T) {
+	st := openStore(t)
+	svc := NewService(st, secret.New("master-key"))
+
+	id, err := svc.CreateGoogleAccount(3, "Mom", "M",
+		&oauth2.Token{RefreshToken: "old-refresh", AccessToken: "old-access"},
+		"mom@example.com", []string{"family@group.calendar.google.com"}, 12*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A different Google login must not take over the account.
+	if err = svc.ReauthorizeGoogleAccount(id, &oauth2.Token{RefreshToken: "x"}, "dad@example.com"); err == nil {
+		t.Fatal("expected an error for a mismatched email")
+	}
+
+	exp := time.Now().Add(time.Hour).Truncate(time.Second)
+	err = svc.ReauthorizeGoogleAccount(id,
+		&oauth2.Token{RefreshToken: "new-refresh", AccessToken: "new-access", TokenType: "Bearer", Expiry: exp},
+		"Mom@Example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	acc, err := svc.Account(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if acc.Config.RefreshToken != "new-refresh" || acc.Config.AccessToken != "new-access" || !acc.Config.Expiry.Equal(exp) {
+		t.Errorf("token not replaced: %+v", acc.Config)
+	}
+	if acc.Name != "Mom" || acc.Marker != "M" || acc.Config.OAuthClientID != 3 ||
+		acc.Config.Email != "mom@example.com" ||
+		len(acc.Config.CalendarIDs) != 1 || acc.Config.CalendarIDs[0] != "family@group.calendar.google.com" {
+		t.Errorf("other settings not preserved: %+v", acc)
+	}
+	accs, _ := svc.Accounts()
+	if len(accs) != 1 {
+		t.Errorf("got %d accounts, want 1 (no duplicate)", len(accs))
+	}
+}

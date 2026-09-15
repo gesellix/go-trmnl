@@ -2,6 +2,13 @@
 <p><a href="/admin/calendar">&larr; Calendar accounts</a></p>
 <h1>{{.Name}} <span class="muted">({{.Provider}})</span></h1>
 {{if .Email}}<p class="muted">{{.Email}}</p>{{end}}
+{{if eq .Provider "google"}}
+<form method="get" action="/admin/calendar/google/start" class="inline">
+  <input type="hidden" name="account" value="{{.ID}}">
+  <button type="submit">Reconnect Google account</button>
+  <span class="muted">Sign in again if syncing fails with an expired or revoked authorization.</span>
+</form>
+{{end}}
 
 <form method="post" action="/admin/calendar/{{.ID}}">
   <label>Name <input type="text" name="name" value="{{.Name}}"></label>

@@ -77,6 +77,13 @@ the classic **APIs & Services** paths are noted in parentheses where they differ
    - Under **Audience → Test users**, add each family member's Google address. A
      "Testing" app is limited to listed test users, which is exactly what a
      family server wants; you do not need to publish or get verified.
+   - **Caveat:** Google expires refresh tokens of an External app in
+     **Testing** status after **7 days**. Syncing then fails with
+     `auth: cannot fetch token: 400 ... "invalid_grant"` and the account needs
+     to be [reconnected](#reconnecting-a-google-account). To avoid the weekly
+     reconnect, set **Audience → Publishing status** to **In production**. A
+     personal app using only `calendar.readonly` works without verification;
+     users just see an "unverified app" warning on the consent screen.
 4. Add the read-only scope under **Google Auth Platform → Data access → Add or
    remove scopes** (classic: the **Scopes** step of the consent screen): search
    the Google Calendar API and select `.../auth/calendar.readonly`. (go-trmnl
@@ -155,6 +162,24 @@ the account needs two-factor authentication enabled.
 
 No global configuration is needed for CalDAV. App-specific passwords are stored
 the same way as Google tokens (encrypted when `TRMNL_SECRET_KEY` is set).
+
+### Reconnecting a Google account
+
+When Google rejects an account's stored authorization (`invalid_grant`: the
+refresh token expired, access was revoked under
+[Google Account → Security → Third-party connections](https://myaccount.google.com/connections),
+or the password changed), the account row shows
+"authorization expired or revoked, reconnect the account" and a **Reconnect**
+button. The account page always offers **Reconnect Google account**. Sign in
+with the same Google address: the new token replaces the old one in place, and
+the calendar selection, name and marker are kept. Signing in with a different
+address is rejected.
+
+To reproduce this locally, run `trmnld` with a copy of the data directory
+(database and `secret.key`), add
+`http://localhost:8080/admin/oauth/google/callback` as an authorized redirect
+URI on the OAuth client, revoke the app's access in your Google Account, and
+click **Sync now**.
 
 ## Testing
 

@@ -2,13 +2,36 @@ package calendar
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
 	gcal "google.golang.org/api/calendar/v3"
 	"google.golang.org/api/option"
 )
+
+// ReauthErrorPrefix starts the last_error message recorded when an account's
+// OAuth grant is no longer valid and the user has to reconnect it.
+const ReauthErrorPrefix = "authorization expired or revoked, reconnect the account"
+
+// IsReauthRequired reports whether err means Google rejected the stored
+// refresh token (invalid_grant), e.g. because it expired (7 days for apps in
+// "Testing" publishing status) or access was revoked. Only a new consent fixes
+// that. The Calendar API client re-wraps token errors through
+// cloud.google.com/go/auth, which does not always keep *oauth2.RetrieveError
+// in the chain, so the error text is checked as a fallback.
+func IsReauthRequired(err error) bool {
+	if err == nil {
+		return false
+	}
+	var re *oauth2.RetrieveError
+	if errors.As(err, &re) && re.ErrorCode == "invalid_grant" {
+		return true
+	}
+	return strings.Contains(err.Error(), `"invalid_grant"`)
+}
 
 // googleSource fetches events from one Google account via the Calendar API.
 type googleSource struct {
