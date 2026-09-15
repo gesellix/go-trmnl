@@ -4,6 +4,8 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -28,32 +30,58 @@ func New() *chi.Mux {
 	return r
 }
 
-// Run serves handler on addr until ctx is cancelled, then shuts down gracefully.
-func Run(ctx context.Context, addr string, handler http.Handler) error {
-	srv := &http.Server{
-		Addr:              addr,
-		Handler:           handler,
-		ReadHeaderTimeout: 10 * time.Second,
-		// WriteTimeout bounds slow/stuck responses (image downloads are small
-		// LAN transfers); IdleTimeout reaps idle keep-alive connections so they
-		// don't accumulate over a long-running process.
-		WriteTimeout: 60 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
+// Listener describes one address the server binds to. A non-nil TLS config
+// serves HTTPS on it.
+type Listener struct {
+	Addr string
+	TLS  *tls.Config
+}
 
-	errCh := make(chan error, 1)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errCh <- err
+// Run serves handler on every listener until ctx is cancelled, then shuts all
+// of them down gracefully. If any listener fails, the others are shut down and
+// the error is returned.
+func Run(ctx context.Context, handler http.Handler, listeners ...Listener) error {
+	servers := make([]*http.Server, 0, len(listeners))
+	errCh := make(chan error, len(listeners))
+	for _, l := range listeners {
+		srv := &http.Server{
+			Addr:              l.Addr,
+			Handler:           handler,
+			TLSConfig:         l.TLS,
+			ReadHeaderTimeout: 10 * time.Second,
+			// WriteTimeout bounds slow/stuck responses (image downloads are small
+			// LAN transfers); IdleTimeout reaps idle keep-alive connections so they
+			// don't accumulate over a long-running process.
+			WriteTimeout: 60 * time.Second,
+			IdleTimeout:  120 * time.Second,
 		}
-	}()
-
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		return srv.Shutdown(shutdownCtx)
+		servers = append(servers, srv)
+		go func(srv *http.Server) {
+			var err error
+			if srv.TLSConfig != nil {
+				// Certificates come from TLSConfig.GetCertificate.
+				err = srv.ListenAndServeTLS("", "")
+			} else {
+				err = srv.ListenAndServe()
+			}
+			if err != nil && err != http.ErrServerClosed {
+				errCh <- fmt.Errorf("listen %s: %w", srv.Addr, err)
+			}
+		}(srv)
 	}
+
+	var runErr error
+	select {
+	case runErr = <-errCh:
+	case <-ctx.Done():
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for _, srv := range servers {
+		if err := srv.Shutdown(shutdownCtx); err != nil && runErr == nil {
+			runErr = err
+		}
+	}
+	return runErr
 }

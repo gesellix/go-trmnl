@@ -85,6 +85,8 @@ func (h *Handler) CalendarList(w http.ResponseWriter, r *http.Request) {
 		"OAuthClients":          crows,
 		"DefaultCalDAVEndpoint": calendar.DefaultCalDAVEndpoint,
 		"RedirectURI":           oauthRedirectURL(r),
+		"HTTPSURL":              h.httpsURL(r),
+		"IsHTTPS":               requestIsHTTPS(r),
 		"BaseURL":               h.baseURL,
 	})
 }

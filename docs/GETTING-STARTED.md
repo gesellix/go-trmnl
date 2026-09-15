@@ -295,6 +295,10 @@ All settings are flags or environment variables (flags win):
 | Flag                | Env                      | Default               | Purpose                                                                                  |
 |---------------------|--------------------------|-----------------------|------------------------------------------------------------------------------------------|
 | `-listen`           | `TRMNL_LISTEN`           | `:8080`               | HTTP listen address                                                                      |
+| `-https-listen`     | `TRMNL_HTTPS_LISTEN`     | (empty)               | HTTPS listen address (e.g. `:8443`); empty disables HTTPS, see [HTTPS](#https)           |
+| `-tls-hosts`        | `TRMNL_TLS_HOSTS`        | (empty)               | Extra comma-separated hostnames/IPs for the local CA certificate                         |
+| `-tls-cert`         | `TRMNL_TLS_CERT`         | (empty)               | Certificate file (PEM) to use instead of the local CA                                    |
+| `-tls-key`          | `TRMNL_TLS_KEY`          | (empty)               | Private key file (PEM) for `-tls-cert`                                                   |
 | `-base-url`         | `TRMNL_BASE_URL`         | auto (LAN IP)         | Public URL the device uses                                                               |
 | `-data-dir`         | `TRMNL_DATA_DIR`         | `./data`              | Root for the database and uploads                                                        |
 | `-db`               | `TRMNL_DB`               | `<data-dir>/trmnl.db` | SQLite database path                                                                     |
@@ -310,6 +314,46 @@ Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
 Google OAuth clients and calendar accounts are configured entirely in
 **Admin → Calendar**; see the
 [Family Calendar plugin](plugins/familycalendar.md) docs.
+
+### HTTPS
+
+The admin UI can additionally be served over HTTPS. Devices keep using
+`-base-url` (plain HTTP); the HTTPS listener serves the same routes on its own
+port, so it can sit next to other services on the same machine:
+
+```sh
+trmnld -base-url http://192.168.1.10:8080 -https-listen :8443 -tls-hosts trmnl.fritz.box
+```
+
+The main reason to enable it is Google OAuth: an app can only be set to
+**In production** (avoiding the 7-day token expiry of **Testing**) when all of
+its redirect URIs use HTTPS. See the
+[Family Calendar plugin](plugins/familycalendar.md#1-create-an-oauth-client).
+
+**Local CA (default).** On first start with `-https-listen`, trmnld creates a
+small certificate authority in `<data-dir>/tls/` (`ca.crt`, `ca.key`) and issues
+a server certificate from it. The certificate covers this machine's hostname
+(plus `<hostname>.local` if it has no domain), the `-base-url` host, `localhost`, `127.0.0.1`, `::1`,
+and every name in `-tls-hosts`. It is valid for 397 days and renewed
+automatically 30 days before expiry, or right away when you add a hostname; the
+CA itself stays the same (10 years).
+
+To make browsers trust it, download the CA certificate from
+**Admin → Settings → HTTPS** (or copy `<data-dir>/tls/ca.crt`), compare the
+SHA-256 fingerprint shown there, and install it as a trusted root on each
+computer you open the admin UI from (macOS: Keychain Access, "Always Trust";
+Windows: "Trusted Root Certification Authorities"; Firefox: its own certificate
+settings). Keep `ca.key` private: whoever has it can issue certificates your
+browsers trust. Deleting the `tls` directory creates a new CA on the next
+start, which then has to be trusted again.
+
+**Own certificate.** Pass `-tls-cert` and `-tls-key` (PEM) to use a certificate
+from elsewhere, e.g. Let's Encrypt or `tailscale cert`. The files are reloaded
+when they change (checked hourly), so renewals need no restart. The local CA
+is not used in this mode.
+
+Binding to port 443 needs root or the `CAP_NET_BIND_SERVICE` capability (the
+Raspberry Pi installer's systemd unit grants it).
 
 ### Credential encryption
 

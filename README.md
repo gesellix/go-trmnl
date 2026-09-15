@@ -78,6 +78,7 @@ Flags or environment variables (flags win). The essentials:
 | `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)        | Admin UI password; empty disables auth         |
 | `-secret-key`     | `TRMNL_SECRET_KEY`     | auto-generated | Key to encrypt stored credentials at rest      |
 | `-no-encryption`  | `TRMNL_NO_ENCRYPTION`  | `false`        | Store credentials in plaintext                 |
+| `-https-listen`   | `TRMNL_HTTPS_LISTEN`   | (empty)        | Optional HTTPS listener for the admin UI       |
 
 Sensitive stored credentials are **encrypted at rest by default** (the calendar
 plugin's OAuth tokens, CalDAV passwords and OAuth client secrets are the first

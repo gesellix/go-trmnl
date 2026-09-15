@@ -41,6 +41,7 @@ func (h *Handler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		"FontMono":   fontMono,
 		"FontTitle":  fontTitle,
 		"BaseURL":    h.baseURL,
+		"HTTPS":      h.httpsInfo(r),
 	})
 }
 

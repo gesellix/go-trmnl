@@ -83,7 +83,7 @@ The script performs the following steps:
 | `TRMNL_ADMIN_USER`     | `admin`                        | Admin username                                      |
 | `TRMNL_ADMIN_PASSWORD` | (empty)                        | Admin password; empty disables admin authentication |
 
-Further `trmnld` settings (for example `TRMNL_SECRET_KEY`) can be added to `/etc/trmnld/trmnld.env` by hand; see the [configuration reference](../../docs/GETTING-STARTED.md#configuration).
+Further `trmnld` settings (for example `TRMNL_SECRET_KEY`, or `TRMNL_HTTPS_LISTEN=:8443` and `TRMNL_TLS_HOSTS` for the [HTTPS listener](../../docs/GETTING-STARTED.md#https)) can be added to `/etc/trmnld/trmnld.env` by hand; see the [configuration reference](../../docs/GETTING-STARTED.md#configuration).
 
 ### Backups
 

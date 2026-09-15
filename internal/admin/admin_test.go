@@ -15,6 +15,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
+	"github.com/gesellix/go-trmnl/internal/tlscert"
 	"golang.org/x/oauth2"
 
 	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
@@ -196,5 +197,59 @@ func TestAdminGoogleReconnectStart(t *testing.T) {
 	res.Body.Close()
 	if !strings.Contains(string(body), "Reconnect Google account") {
 		t.Error("account page lacks the reconnect button")
+	}
+}
+
+func TestAdminHTTPSInfoAndCADownload(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(filepath.Join(dir, "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	src := tlscert.NewLocalCA(filepath.Join(dir, "tls"), []string{"trmnl.fritz.box"})
+
+	r := server.New()
+	admin.New(st, "http://test.local", dir, admin.Auth{}, nil).WithHTTPS(":9443", src).Routes(r)
+	ts := httptest.NewServer(r)
+	t.Cleanup(ts.Close)
+
+	res, err := ts.Client().Get(ts.URL + "/admin/tls/ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK || !strings.HasPrefix(string(body), "-----BEGIN CERTIFICATE-----") {
+		t.Fatalf("CA download: status %d, body %.40q", res.StatusCode, body)
+	}
+	fp, _ := tlscert.Fingerprint(body)
+
+	res, err = ts.Client().Get(ts.URL + "/admin/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	host := strings.TrimPrefix(ts.URL, "http://")
+	hostname := host[:strings.LastIndex(host, ":")]
+	for _, want := range []string{"https://" + hostname + ":9443/admin", fp, "trmnl.fritz.box"} {
+		if !strings.Contains(string(page), want) {
+			t.Errorf("settings page lacks %q", want)
+		}
+	}
+
+	// Without HTTPS the CA download does not exist.
+	r2 := server.New()
+	admin.New(st, "http://test.local", dir, admin.Auth{}, nil).Routes(r2)
+	ts2 := httptest.NewServer(r2)
+	t.Cleanup(ts2.Close)
+	res, err = ts2.Client().Get(ts2.URL + "/admin/tls/ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("CA download without HTTPS: status %d, want 404", res.StatusCode)
 	}
 }

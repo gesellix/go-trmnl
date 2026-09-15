@@ -15,6 +15,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/render"
 	"github.com/gesellix/go-trmnl/internal/store"
+	"github.com/gesellix/go-trmnl/internal/tlscert"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -35,6 +36,8 @@ type Handler struct {
 	tmpl       *templateSet
 	auth       Auth
 	cal        *calendar.Service
+	httpsAddr  string          // optional HTTPS listen address
+	tls        *tlscert.Source // optional HTTPS certificate source
 }
 
 // New creates the admin handler. auth guards the UI when its Password is set.
@@ -108,6 +111,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/playlists/{id}/delete", h.PlaylistDelete)
 
 		r.Get("/settings", h.SettingsPage)
+		r.Get("/tls/ca.crt", h.TLSCACert)
 		r.Post("/settings", h.SettingsSave)
 
 		r.Get("/calendar", h.CalendarList)
