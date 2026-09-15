@@ -1,3 +1,9 @@
+---
+layout: default
+title: Privacy Policy
+description: How go-trmnl handles data, including Google user data.
+---
+
 # Privacy Policy
 
 _Last updated: 2026-09-15_
@@ -63,7 +69,7 @@ Depending on the plugins an operator enables, the server stores or requests:
 
 ## Changes
 
-Changes to this policy are tracked in the project's Git history.
+Changes to this policy are tracked in the project's [Git history](https://github.com/gesellix/go-trmnl/commits/main/site/privacy.md).
 
 ## Contact
 

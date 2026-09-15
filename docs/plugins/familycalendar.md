@@ -89,11 +89,12 @@ the classic **APIs & Services** paths are noted in parentheses where they differ
      verification; users just see an "unverified app" warning on the consent
      screen. Publishing also requires an app name, support email, home page
      and privacy policy link under **Branding**. For a go-trmnl installation
-     you can use `https://github.com/gesellix/go-trmnl` as the home page, and
-     [`docs/PRIVACY.md`](../PRIVACY.md) and [`docs/TERMS.md`](../TERMS.md)
-     (`https://github.com/gesellix/go-trmnl/blob/main/docs/PRIVACY.md`, same
-     for `TERMS.md`) as privacy policy and terms of service. Google may require
-     the domain of these links to be listed under **Authorized domains**.
+     you can use the project site: home page
+     <https://gesellix.github.io/go-trmnl/>, privacy policy
+     <https://gesellix.github.io/go-trmnl/privacy/> and terms of service
+     <https://gesellix.github.io/go-trmnl/terms/>. Google may require the
+     domain of these links (`gesellix.github.io`) to be listed under
+     **Authorized domains**.
 4. Add the read-only scope under **Google Auth Platform → Data access → Add or
    remove scopes** (classic: the **Scopes** step of the consent screen): search
    the Google Calendar API and select `.../auth/calendar.readonly`. (go-trmnl

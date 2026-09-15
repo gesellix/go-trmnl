@@ -1,0 +1,9 @@
+title: go-trmnl
+description: Self-hosted server for TRMNL e-ink displays, written in Go.
+repository: gesellix/go-trmnl
+markdown: kramdown
+permalink: pretty
+exclude:
+  - README.md
+baseurl: /go-trmnl
+url: https://gesellix.github.io

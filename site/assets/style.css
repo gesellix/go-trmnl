@@ -1,0 +1,82 @@
+:root {
+  --bg: #fbfaf7;
+  --fg: #1d1d1b;
+  --muted: #6b6a66;
+  --line: #dedbd3;
+  --accent: #1d1d1b;
+  --code: #efece5;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151514;
+    --fg: #ecebe6;
+    --muted: #a3a19b;
+    --line: #34332f;
+    --accent: #ecebe6;
+    --code: #242320;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 17px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.wrap {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding-inline: 1.25rem;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-block: 1.5rem;
+  border-bottom: 2px solid var(--fg);
+}
+
+.brand {
+  font: 700 1.35rem/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: -0.02em;
+}
+
+nav, footer { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+
+a { color: var(--accent); text-underline-offset: 0.2em; }
+header a, footer a { text-decoration: none; }
+header a:hover, footer a:hover { text-decoration: underline; }
+
+main { padding-block: 2rem 3rem; overflow-wrap: anywhere; }
+
+main pre { overflow-wrap: normal; }
+
+h1, h2, h3 { line-height: 1.25; letter-spacing: -0.01em; }
+h1 { font-size: 2.1rem; margin: 0 0 0.75rem; }
+h2 { font-size: 1.35rem; margin-top: 2.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+
+.lead { font-size: 1.2rem; color: var(--muted); margin-top: 0; }
+
+code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9em; }
+code { background: var(--code); padding: 0.1em 0.3em; border-radius: 3px; }
+pre { background: var(--code); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+
+table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
+th, td { text-align: left; padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+
+footer {
+  padding-block: 1.5rem 2.5rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+footer a { color: var(--muted); }
