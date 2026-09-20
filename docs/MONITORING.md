@@ -8,6 +8,22 @@ The device values are read from the database at scrape time, not counted in
 memory: they survive a restart and always reflect the last `/api/display` poll
 of each device.
 
+## A ready-made stack
+
+If you have no monitoring yet, [`deploy/monitoring`](../deploy/monitoring/)
+is a five-container Docker stack for a Raspberry Pi or NAS (VictoriaMetrics,
+vmalert, Alertmanager, ntfy, Grafana) with a go-trmnl template that installs
+the scrape job, the alert rules below and a dashboard:
+
+```sh
+cd deploy/monitoring
+cp .env.example .env && $EDITOR .env
+docker compose up -d
+./add-template.sh trmnl
+```
+
+The rest of this page describes the endpoint itself, for an existing setup.
+
 ## Exposing the endpoint
 
 By default `/metrics` is served on the regular listener(s), next to `/admin`
@@ -64,6 +80,9 @@ The standard Go runtime and process collectors (`go_*`, `process_*`) are
 exported as well.
 
 ## Scrape configuration
+
+The [stack template](../deploy/monitoring/templates/trmnl/) ships this as a
+drop-in file; for an existing Prometheus:
 
 ```yaml
 scrape_configs:

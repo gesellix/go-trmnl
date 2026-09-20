@@ -105,7 +105,8 @@ intervals, etc.).
   and how to add your own. Calendar setup (Google OAuth, Apple/CalDAV) is in the
   [Family Calendar page](docs/plugins/familycalendar.md).
 - **[Monitoring](docs/MONITORING.md)** — the Prometheus `/metrics` endpoint,
-  what it exports, and example scrape and alerting rules.
+  what it exports, and example scrape and alerting rules. A runnable stack for
+  a Pi or NAS is in [deploy/monitoring](deploy/monitoring/).
 - **[Device API reference](docs/API.md)** — the firmware-facing endpoints,
   headers and responses.
 - **[Design notes](docs/PLAN.md)** — architecture and how the server is built.

@@ -1,0 +1,133 @@
+# A small monitoring stack for a Raspberry Pi or NAS: metrics storage with
+# scraping, rule evaluation, alert notifications and dashboards.
+#
+# Nothing here is go-trmnl specific. Targets, alert rules and dashboards are
+# dropped into victoriametrics/conf.d/, vmalert/rules/ and grafana/dashboards/;
+# ./add-template.sh installs the ones shipped under templates/.
+#
+# Copy .env.example to .env before the first start. See README.md.
+
+name: monitoring
+
+# Keep container logs from filling the disk on a Pi (default is unbounded).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # Metrics database. Scrapes the targets itself, so no separate agent is
+  # needed for a handful of endpoints on the local network.
+  victoriametrics:
+    logging: *logging
+    image: victoriametrics/victoria-metrics:v1.152.0
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=${VM_RETENTION:-12}
+      # Caps the cache allocation. VictoriaMetrics grabs 60% of system memory
+      # by default, which is too greedy on a box that also runs other services.
+      - -memory.allowedPercent=${VM_MEMORY_PERCENT:-30}
+      - -promscrape.config=/etc/victoriametrics/scrape.yml
+      # Picks up new or edited files in conf.d/ without a restart.
+      - -promscrape.configCheckInterval=1m
+      - -httpListenAddr=:8428
+      - -loggerTimezone=${TZ:-UTC}
+    # Credentials and target addresses used by the scrape jobs in conf.d/.
+    # Optional: the stack runs without it if nothing needs credentials.
+    env_file:
+      - path: ./scrape.env
+        required: false
+    volumes:
+      - ./victoriametrics:/etc/victoriametrics:ro
+      - vm-data:/storage
+    ports:
+      - "${VM_ADDR:-127.0.0.1}:8428:8428"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8428/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Rule evaluation. Reads and writes through VictoriaMetrics, so firing alerts
+  # and recording rules survive a restart of either container.
+  vmalert:
+    logging: *logging
+    image: victoriametrics/vmalert:v1.152.0
+    restart: unless-stopped
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+    command:
+      - -rule=/etc/vmalert/rules/*.yml
+      - -datasource.url=http://victoriametrics:8428
+      - -remoteWrite.url=http://victoriametrics:8428
+      - -remoteRead.url=http://victoriametrics:8428
+      - -notifier.url=http://alertmanager:9093
+      - -evaluationInterval=${VMALERT_INTERVAL:-1m}
+      - -external.url=${VMALERT_EXTERNAL_URL:-http://localhost:8880}
+      - -rule.resendDelay=5m
+      - -httpListenAddr=:8880
+      - -loggerTimezone=${TZ:-UTC}
+    volumes:
+      - ./vmalert/rules:/etc/vmalert/rules:ro
+    ports:
+      - "${VM_ADDR:-127.0.0.1}:8880:8880"
+
+  # Alert routing: grouping, silences, inhibition.
+  alertmanager:
+    logging: *logging
+    image: prom/alertmanager:v0.34.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://localhost:9093}
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "${VM_ADDR:-127.0.0.1}:9093:9093"
+
+  # Turns Alertmanager webhooks into readable ntfy push notifications.
+  # Drop this service (and the receiver in alertmanager.yml) if you notify
+  # some other way. No linux/arm/v7 image: needs a 64-bit OS on a Pi.
+  ntfy-alertmanager:
+    logging: *logging
+    image: xenrox/ntfy-alertmanager:1.0.1
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager/ntfy-alertmanager.scfg:/etc/ntfy-alertmanager/config:ro
+    expose:
+      - "8080"
+
+  # Dashboards. Datasource and dashboard folders are provisioned from disk, so
+  # a fresh container comes up with everything already wired.
+  grafana:
+    logging: *logging
+    image: grafana/grafana-oss:13.0.2
+    restart: unless-stopped
+    depends_on:
+      victoriametrics:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_ADDR:-0.0.0.0}:${GRAFANA_PORT:-3000}:3000"
+
+volumes:
+  vm-data:
+  alertmanager-data:
+  grafana-data:
