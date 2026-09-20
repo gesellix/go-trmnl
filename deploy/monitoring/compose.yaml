@@ -103,6 +103,35 @@ services:
     expose:
       - "8080"
 
+  # Self-hosted ntfy, in the "ntfy" profile: notifications then never leave the
+  # network. Point the bridge at it by setting "server http://ntfy" in
+  # alertmanager/ntfy-alertmanager.scfg. Without this profile the bridge talks
+  # to ntfy.sh, which is the default.
+  ntfy:
+    profiles: ["ntfy"]
+    logging: *logging
+    image: binwiederhier/ntfy:v2.28.0
+    restart: unless-stopped
+    command: ["serve"]
+    environment:
+      TZ: ${TZ:-UTC}
+      # The URL phones subscribe to; the app refuses to add a server it cannot
+      # reach under this exact address, so use the host's LAN name or IP.
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-http://localhost:8090}
+      NTFY_LISTEN_HTTP: ":80"
+      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+      NTFY_CACHE_DURATION: ${NTFY_CACHE_DURATION:-24h}
+      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+      NTFY_BEHIND_PROXY: "false"
+      # iOS only receives instant push through ntfy.sh. Setting this relays a
+      # wake-up (not the message itself) via ntfy.sh so the app fetches from
+      # here; leave it empty on Android, which subscribes directly.
+      NTFY_UPSTREAM_BASE_URL: ${NTFY_UPSTREAM_BASE_URL:-}
+    volumes:
+      - ntfy-data:/var/lib/ntfy
+    ports:
+      - "${NTFY_ADDR:-0.0.0.0}:${NTFY_PORT:-8090}:80"
+
   # Dashboards. Datasource and dashboard folders are provisioned from disk, so
   # a fresh container comes up with everything already wired.
   #
@@ -134,6 +163,7 @@ services:
       - "${GRAFANA_ADDR:-0.0.0.0}:${GRAFANA_PORT:-3000}:3000"
 
 volumes:
+  ntfy-data:
   vm-data:
   alertmanager-data:
   grafana-data:

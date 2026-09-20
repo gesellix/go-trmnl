@@ -30,8 +30,8 @@
           "editorMode": "code",
           "expr": "trmnl_battery_voltage_volts{device_id=~\"$device\"}",
           "refId": "A",
-          "range": true,
-          "instant": false,
+          "range": false,
+          "instant": true,
           "format": "time_series",
           "legendFormat": "{{device_id}}"
         }
@@ -104,8 +104,8 @@
           "editorMode": "code",
           "expr": "time() - trmnl_last_seen_timestamp_seconds{device_id=~\"$device\"}",
           "refId": "A",
-          "range": true,
-          "instant": false,
+          "range": false,
+          "instant": true,
           "format": "time_series",
           "legendFormat": "{{device_id}}"
         }
@@ -174,8 +174,8 @@
           "editorMode": "code",
           "expr": "trmnl_wifi_rssi_dbm{device_id=~\"$device\"}",
           "refId": "A",
-          "range": true,
-          "instant": false,
+          "range": false,
+          "instant": true,
           "format": "time_series",
           "legendFormat": "{{device_id}}"
         }
@@ -263,7 +263,7 @@
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "fillOpacity": 6,
-            "showPoints": "never",
+            "showPoints": "auto",
             "pointSize": 8,
             "spanNulls": 3600000,
             "axisSoftMin": null,
@@ -357,7 +357,7 @@
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "fillOpacity": 6,
-            "showPoints": "never",
+            "showPoints": "auto",
             "pointSize": 8,
             "spanNulls": 3600000,
             "axisSoftMin": null,
@@ -405,7 +405,7 @@
       "id": 6,
       "type": "state-timeline",
       "title": "Charging",
-      "description": "Voltage rises while charging, so trend predictions are meaningless in these windows.",
+      "description": "Voltage rises while charging, so trend predictions are meaningless in these windows. Stays empty for firmware that reports no charging state.",
       "gridPos": {
         "h": 6,
         "w": 12,
@@ -632,7 +632,7 @@
     ]
   },
   "time": {
-    "from": "now-7d",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {},
