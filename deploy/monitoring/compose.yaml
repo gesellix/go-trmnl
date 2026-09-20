@@ -105,7 +105,12 @@ services:
 
   # Dashboards. Datasource and dashboard folders are provisioned from disk, so
   # a fresh container comes up with everything already wired.
+  #
+  # In the "dashboards" profile, which .env.example enables. Leave it out on a
+  # host with little memory and query through vmui instead; see README.md
+  # ("Small hosts").
   grafana:
+    profiles: ["dashboards"]
     logging: *logging
     image: grafana/grafana-oss:13.0.2
     restart: unless-stopped
@@ -115,6 +120,7 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD in .env}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
