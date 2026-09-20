@@ -44,7 +44,11 @@ $EDITOR alertmanager/ntfy-alertmanager.scfg   # set your ntfy topic
 docker compose up -d
 ```
 
-Grafana is then at `http://<host>:3000`. It runs in the `dashboards` Compose
+Grafana is then at `http://<host>:3000`, with the credentials from `.env`.
+`GRAFANA_PASSWORD` is only applied when Grafana first initializes its
+database, so to change it later use
+`docker compose exec grafana grafana cli admin reset-admin-password '<new>'`,
+or delete the `monitoring_grafana-data` volume and start again. It runs in the `dashboards` Compose
 profile, which `.env.example` enables through `COMPOSE_PROFILES`; without that
 line the other four services come up alone. VictoriaMetrics (`:8428`), vmalert
 (`:8880`) and Alertmanager (`:9093`) bind to localhost only by default; set
@@ -63,7 +67,22 @@ and follow [templates/trmnl/README.md](templates/trmnl/README.md).
 The stack pushes to [ntfy](https://ntfy.sh): install the app, subscribe to a
 topic, and put that topic in `alertmanager/ntfy-alertmanager.scfg`. On the
 public server the topic name is the only protection, so pick something long
-and random. Point `server` at your own ntfy instance if you run one.
+and random.
+
+The bridge reads that file **at startup**, so run
+`docker compose restart ntfy-alertmanager` after editing it. Two things make
+ntfy answer `404 page not found`, which shows up in
+`docker compose logs ntfy-alertmanager` as "Failed to publish notification":
+a topic longer than 64 characters, and a topic that still contains a host or a
+slash (`ntfy.sh/my-topic` instead of `my-topic`).
+
+**Your own ntfy server.** Add `ntfy` to `COMPOSE_PROFILES` in `.env` and set
+`server http://ntfy` in `ntfy-alertmanager.scfg`; notifications then stay on
+your network. Set `NTFY_BASE_URL` to the address phones reach it under (the
+app rejects a server it cannot reach under exactly that URL). The Android app
+subscribes directly; iOS only receives instant push through ntfy.sh, so it
+needs `NTFY_UPSTREAM_BASE_URL=https://ntfy.sh`, which relays a wake-up, not
+the message body.
 
 To use something else (email, Gotify, a webhook), replace the `ntfy` receiver
 in `alertmanager/alertmanager.yml` with any

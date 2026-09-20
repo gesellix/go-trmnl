@@ -8,12 +8,16 @@ log-level info
 alert-mode single
 
 ntfy {
-    # Public server, or your own (e.g. http://ntfy.fritz.box:8080).
+    # Public server by default. To use the stack's own ntfy instead, add "ntfy"
+    # to COMPOSE_PROFILES in .env and point this at the container:
+    #   server http://ntfy
     server https://ntfy.sh
 
     # CHANGE THIS. On the public server the topic is the only thing protecting
     # your notifications: anyone who knows the name can read and post to it.
     # Pick something long and random, then subscribe to it in the ntfy app.
+    # A topic is a bare name: no host, no slashes, at most 64 characters.
+    # ntfy answers 404 otherwise, and the bridge logs "Failed to publish".
     topic go-trmnl-CHANGE-ME-8f3a1c
 
     markdown true
