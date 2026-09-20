@@ -71,6 +71,10 @@ func (s *Store) ListDevices() ([]*Device, error) {
 }
 
 // Telemetry holds the subset of device fields updated on each display poll.
+// The refresh rate is deliberately absent: the device reports whatever interval
+// it currently sleeps for, including its own retry and fast-poll backoffs, and
+// storing that would let a transient client-side value replace the schedule
+// configured in the admin UI (and be handed straight back on the next poll).
 type Telemetry struct {
 	FWVersion       sql.NullString
 	Model           sql.NullString
@@ -80,7 +84,6 @@ type Telemetry struct {
 	BatteryCharging sql.NullBool
 	RSSI            sql.NullInt64
 	WifiStatus      sql.NullString
-	RefreshRate     sql.NullInt64
 }
 
 // UpdateTelemetry persists the latest telemetry for a device and stamps
@@ -95,11 +98,10 @@ func (s *Store) UpdateTelemetry(deviceID int64, t Telemetry) error {
 		battery_charging = COALESCE(?, battery_charging),
 		rssi             = COALESCE(?, rssi),
 		wifi_status      = COALESCE(?, wifi_status),
-		refresh_rate     = COALESCE(?, refresh_rate),
 		last_seen_at     = unixepoch()
 		WHERE id = ?`,
 		t.FWVersion, t.Model, t.Width, t.Height, t.BatteryVoltage, t.BatteryCharging,
-		t.RSSI, t.WifiStatus, t.RefreshRate, deviceID)
+		t.RSSI, t.WifiStatus, deviceID)
 	return err
 }
 

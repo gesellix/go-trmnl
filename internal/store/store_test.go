@@ -363,3 +363,27 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 		t.Errorf("data lost after reopen: %v", err)
 	}
 }
+
+// The device's own Refresh-Rate header must not touch the configured schedule:
+// the firmware reports its retry intervals there, which would otherwise be
+// handed straight back to it.
+func TestUpdateTelemetryKeepsRefreshRate(t *testing.T) {
+	st := openTest(t)
+	d := newDevice(t, st, "AA:BB:CC:DD:EE:07")
+
+	if err := st.UpdateTelemetry(d.ID, store.Telemetry{
+		BatteryVoltage: sql.NullFloat64{Float64: 3.9, Valid: true},
+	}); err != nil {
+		t.Fatalf("telemetry: %v", err)
+	}
+	got, err := st.GetDeviceByID(d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RefreshRate != d.RefreshRate {
+		t.Errorf("refresh_rate = %d, want %d", got.RefreshRate, d.RefreshRate)
+	}
+	if !got.BatteryVoltage.Valid || got.BatteryVoltage.Float64 != 3.9 {
+		t.Errorf("battery not persisted: %+v", got.BatteryVoltage)
+	}
+}

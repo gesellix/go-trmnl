@@ -164,6 +164,31 @@ func TestDisplay(t *testing.T) {
 		}
 	})
 
+	// The firmware reports whatever interval it currently sleeps for, including
+	// its retry backoffs (which start at 15 seconds). Persisting that would hand
+	// the device a few-second poll loop on the next response.
+	t.Run("reported refresh rate is ignored", func(t *testing.T) {
+		before, _ := st.GetDeviceByMAC(testMAC)
+		resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{
+			"ID":           testMAC,
+			"Access-Token": d.APIKey,
+			"Refresh-Rate": "15",
+		}, "")
+		defer resp.Body.Close()
+
+		var body struct {
+			RefreshRate int `json:"refresh_rate"`
+		}
+		json.NewDecoder(resp.Body).Decode(&body)
+		if body.RefreshRate != before.RefreshRate {
+			t.Errorf("served refresh_rate = %d, want the configured %d", body.RefreshRate, before.RefreshRate)
+		}
+		got, _ := st.GetDeviceByMAC(testMAC)
+		if got.RefreshRate != before.RefreshRate {
+			t.Errorf("stored refresh_rate = %d, want the configured %d", got.RefreshRate, before.RefreshRate)
+		}
+	})
+
 	t.Run("bad token", func(t *testing.T) {
 		resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{
 			"ID": testMAC, "Access-Token": "wrong",

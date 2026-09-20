@@ -119,7 +119,7 @@ func newDeviceCollector(st *store.Store) *deviceCollector {
 		rssi: deviceDesc("trmnl_wifi_rssi_dbm",
 			"WiFi signal strength reported on the last display poll."),
 		refreshRate: deviceDesc("trmnl_refresh_rate_seconds",
-			"Refresh interval the server hands out to the device."),
+			"Refresh interval the server hands out to the device, as configured in the admin UI."),
 		scrapeErrors: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "trmnl_metrics_scrape_errors_total",
 			Help: "Number of scrapes that failed to read devices from the store.",
