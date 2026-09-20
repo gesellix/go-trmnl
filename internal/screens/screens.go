@@ -36,6 +36,7 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 		return render.Result{}, errors.New("unknown plugin type " + pluginRow.Type)
 	}
 
+	battery := device != nil && device.ShowBattery
 	in := plugins.RenderInput{
 		Device:    device,
 		Screen:    sc,
@@ -46,6 +47,9 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 		AssetsDir: assetsDir,
 		Fonts:     fonts,
 	}
+	if battery {
+		in.FooterReserveRight = render.BatteryFooterWidth
+	}
 	model, err := p.DataModel(ctx, in)
 	if err != nil {
 		return render.Result{}, err
@@ -54,10 +58,35 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 	if err != nil {
 		return render.Result{}, err
 	}
+	if battery {
+		level, charging := BatteryState(device)
+		render.DrawBatteryIndicator(img, level, charging)
+	}
 	res, err := r.Process(img, mode)
 	if err != nil {
 		return render.Result{}, err
 	}
-	_ = st.SetScreenRendered(sc.ID, res.Hash)
+	// A screen with the indicator looks different per device, so it cannot go
+	// into the shared per-screen cache.
+	if battery {
+		level, charging := BatteryState(device)
+		_ = st.SetDeviceScreenRender(device.ID, sc.ID, res.Hash, render.BatteryState(level, charging))
+	} else {
+		_ = st.SetScreenRendered(sc.ID, res.Hash)
+	}
 	return res, nil
+}
+
+// BatteryState reports what the footer indicator would show for a device: its
+// coarse charge level and whether it reported itself as charging. Telemetry a
+// device has never sent leaves the level unknown.
+func BatteryState(d *store.Device) (render.BatteryLevel, bool) {
+	if d == nil {
+		return render.BatteryUnknown, false
+	}
+	level := render.BatteryUnknown
+	if d.BatteryVoltage.Valid {
+		level = render.BatteryLevelFor(d.BatteryVoltage.Float64)
+	}
+	return level, d.BatteryCharging.Valid && d.BatteryCharging.Bool
 }

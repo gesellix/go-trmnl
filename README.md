@@ -28,6 +28,8 @@ server, renders the returned 800x480 1-bit image, then sleeps for its
 - **Show a family calendar** merged from multiple **Google** and **Apple
   iCloud / CalDAV** accounts, deduplicated across people, with credentials
   encrypted at rest.
+- **Show a battery indicator** in the screen footer, per device, in four steps
+  so the image (and the e-ink panel) only changes when the level does.
 - **Scrape it with Prometheus** at `/metrics`: battery voltage, WiFi signal,
   last-seen timestamps per device, ready for Grafana dashboards and low-battery
   alerts.

@@ -43,6 +43,9 @@ type Data struct {
 	Total      int // days in the year (365 or 366)
 	TodayIndex int // zero-based index of today within the year
 	Label      string
+	// FooterReserve is horizontal space kept free at the bottom right for the
+	// server-drawn battery indicator; see plugins.RenderInput.
+	FooterReserveRight int
 }
 
 // DataModel computes the year-progress numbers for "today" in the configured
@@ -79,6 +82,7 @@ func (p *Plugin) DataModel(_ context.Context, in plugins.RenderInput) (any, erro
 // Render draws the screen to an RGBA image.
 func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*image.RGBA, error) {
 	d, _ := raw.(Data)
+	d.FooterReserveRight = in.FooterReserveRight
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))
 	dc := gg.NewContextForRGBA(img)
 	dc.SetRGB(1, 1, 1)

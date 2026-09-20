@@ -122,6 +122,9 @@ type Data struct {
 	Sunset    string // "21:40"
 
 	Days []DayForecast
+	// FooterReserve is horizontal space kept free at the bottom right for the
+	// server-drawn battery indicator; see plugins.RenderInput.
+	FooterReserveRight int
 }
 
 // DayForecast is one day in the forecast strip.
@@ -312,6 +315,7 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	if !ok {
 		return nil, fmt.Errorf("weather: invalid data model")
 	}
+	d.FooterReserveRight = in.FooterReserveRight
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))
 	dc := gg.NewContextForRGBA(img)
 	dc.SetRGB(1, 1, 1)

@@ -50,6 +50,11 @@
     </select>
     <p class="muted" style="margin-top: 0; font-size: 0.9em;">Bundles use assets from <code>data/uploads/assets/bundles/</code>. Global font overrides in Settings take precedence.</p>
   </label>
+  <label>
+    <input type="checkbox" name="show_battery" value="1" {{if $d.ShowBattery}}checked{{end}}>
+    Battery indicator in the screen footer
+    <p class="muted" style="margin-top: 0; font-size: 0.9em;">Draws a four-step battery symbol in the bottom right of every screen this device shows. It changes only when the level changes, so cached images and e-ink refreshes are unaffected.</p>
+  </label>
   <label>Special function
     {{$fn := def "none" (ns $d.SpecialFunction)}}
     <select name="special_function">

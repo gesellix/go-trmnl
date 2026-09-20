@@ -110,11 +110,43 @@ func (s *Store) SetScreenRendered(id int64, hash string) error {
 	return err
 }
 
+// DeviceScreenRender returns the cached render for one device's view of a
+// screen. Devices drawing a battery indicator see a different image than the
+// screen's shared one, so their cache entry is keyed by both.
+// batteryState is what the indicator drew, so a changed battery invalidates
+// the entry even while the plugin's own refresh interval has not elapsed.
+func (s *Store) DeviceScreenRender(deviceID, screenID int64) (hash string, renderedAt int64, batteryState int, ok bool, err error) {
+	err = s.db.QueryRow(`SELECT rendered_hash, rendered_at, battery_state FROM device_screen_renders
+		WHERE device_id = ? AND screen_id = ?`, deviceID, screenID).Scan(&hash, &renderedAt, &batteryState)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", 0, 0, false, nil
+	}
+	if err != nil {
+		return "", 0, 0, false, err
+	}
+	return hash, renderedAt, batteryState, true, nil
+}
+
+// SetDeviceScreenRender stores the cached render for one device's view.
+func (s *Store) SetDeviceScreenRender(deviceID, screenID int64, hash string, batteryState int) error {
+	_, err := s.db.Exec(`INSERT INTO device_screen_renders
+		(device_id, screen_id, rendered_hash, rendered_at, battery_state)
+		VALUES (?, ?, ?, unixepoch(), ?)
+		ON CONFLICT(device_id, screen_id) DO UPDATE SET rendered_hash = excluded.rendered_hash,
+			rendered_at = excluded.rendered_at, battery_state = excluded.battery_state`,
+		deviceID, screenID, hash, batteryState)
+	return err
+}
+
 // ActiveRenderHashes returns the distinct, currently-referenced render hashes
-// across all screens, used to decide which cached image files to keep.
+// across all screens and per-device renders, used to decide which cached image
+// files to keep.
 func (s *Store) ActiveRenderHashes() ([]string, error) {
 	rows, err := s.db.Query(`SELECT DISTINCT rendered_hash FROM screens
-		WHERE rendered_hash IS NOT NULL AND rendered_hash <> ''`)
+		WHERE rendered_hash IS NOT NULL AND rendered_hash <> ''
+		UNION
+		SELECT DISTINCT rendered_hash FROM device_screen_renders
+		WHERE rendered_hash <> ''`)
 	if err != nil {
 		return nil, err
 	}

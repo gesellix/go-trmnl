@@ -28,6 +28,8 @@ type Device struct {
 	ResetFirmware   bool
 	SpecialFunction sql.NullString
 	FontBundle      string
+	// ShowBattery draws a battery indicator in the rendered screen's footer.
+	ShowBattery bool
 }
 
 // DeviceLog is a single log entry reported by a device.

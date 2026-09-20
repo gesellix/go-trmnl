@@ -52,7 +52,7 @@ func draw(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	drawCalendarGlyph(dc, margin+10, footerY-2, 18)
 	setFace(dc, fs, 20, plugins.StyleTitle)
 	dc.DrawStringAnchored("Days Left This Year", margin+34, footerY, 0, 0.5)
-	dc.DrawStringAnchored(fmt.Sprintf("%d", d.Year), fw-margin, footerY, 1, 0.5)
+	dc.DrawStringAnchored(fmt.Sprintf("%d", d.Year), fw-margin-float64(d.FooterReserveRight), footerY, 1, 0.5)
 }
 
 // drawDottedBar draws a vertical column of small dots between y0 and y1.

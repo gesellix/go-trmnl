@@ -80,7 +80,8 @@ func (h *Handler) DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	playlistID, _ := parseInt64(r.FormValue("playlist_id"))
 	bundle := r.FormValue("font_bundle")
-	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID), bundle); err != nil {
+	showBattery := r.FormValue("show_battery") != ""
+	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID), bundle, showBattery); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

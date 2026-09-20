@@ -174,7 +174,7 @@ func drawFooter(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 		timeFmt = "15:04"
 	}
 	updated := "Updated: " + d.Now.Format("Jan 2, 2006") + ", " + d.Now.Format(timeFmt)
-	dc.DrawStringAnchored(updated, float64(w)-15, float64(h)-15, 1, 0.5)
+	dc.DrawStringAnchored(updated, float64(w-d.FooterReserveRight)-15, float64(h)-15, 1, 0.5)
 }
 
 type weatherCategory int

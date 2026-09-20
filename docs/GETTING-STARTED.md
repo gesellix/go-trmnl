@@ -195,6 +195,24 @@ Lower the device's refresh rate for faster updates (at the cost of battery).
 
 ---
 
+## Battery indicator
+
+**Admin → Devices → (device) → Battery indicator in the screen footer** draws a
+small battery symbol in the bottom right of every screen that device shows,
+with a bolt while it reports charging. Built-in plugins move their own
+footer text left to make room.
+
+It has four steps (and an empty outline until the first telemetry arrives)
+rather than a percentage or a voltage, on purpose: the rendered image is cached
+by content hash, so a value that changed on every poll would make the device
+download a new image and do a full e-ink refresh each time, costing more
+battery than the indicator is worth. As it is, the picture changes only when
+the level does. Exact voltages are on the device page and in
+[`/metrics`](MONITORING.md).
+
+Enabling it makes that device's renders device-specific, so a screen shared
+with other devices is rendered once per device instead of once in total.
+
 ## Customizing fonts
 
 You can override the default Go fonts with your own TTF/OTF files, or choose between built-in TRMNL font bundles. The server uses a priority hierarchy: **Custom Overrides > Font Bundles > Go Defaults**.
