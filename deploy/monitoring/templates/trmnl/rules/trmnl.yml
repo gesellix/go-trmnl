@@ -29,20 +29,25 @@ groups:
 
       - alert: TrmnlBatteryTrend
         expr: |
-          predict_linear(trmnl_battery_voltage_volts[7d], 7 * 86400) < 3.3
-            and avg_over_time(trmnl_battery_voltage_volts[6h]) < 3.7
-            and trmnl_battery_charging == 0
+          (
+            predict_linear(trmnl_battery_voltage_volts[7d], 7 * 86400) < 3.3
+              and avg_over_time(trmnl_battery_voltage_volts[6h]) < 3.7
+          )
+          unless trmnl_battery_charging == 1
         for: 6h
         labels:
           severity: warning
         annotations:
           summary: "{{ $labels.device_id }}: battery runs out within a week"
-          description: "Extrapolated from the last 7 days, while not charging."
+          description: "Extrapolated from the last 7 days."
 
       # trmnl_last_seen_timestamp_seconds is the last /api/display poll. Three
       # missed polls in a row means the device is off, asleep or off the WiFi.
+      # The floor keeps the rule sane for a device that polls every few seconds:
+      # without it the window can end up shorter than the scrape interval, and
+      # the alert fires permanently.
       - alert: TrmnlSilent
-        expr: time() - trmnl_last_seen_timestamp_seconds > 3 * trmnl_refresh_rate_seconds
+        expr: time() - trmnl_last_seen_timestamp_seconds > clamp_min(3 * trmnl_refresh_rate_seconds, 1800)
         for: 15m
         labels:
           severity: warning

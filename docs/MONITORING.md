@@ -124,15 +124,17 @@ groups:
       # and ignore devices that are charging.
       - alert: TrmnlBatteryTrend
         expr: |
-          predict_linear(trmnl_battery_voltage_volts[7d], 7 * 86400) < 3.3
-            and trmnl_battery_voltage_volts < 3.7
-            and trmnl_battery_charging == 0
+          (
+            predict_linear(trmnl_battery_voltage_volts[7d], 7 * 86400) < 3.3
+              and avg_over_time(trmnl_battery_voltage_volts[6h]) < 3.7
+          )
+          unless trmnl_battery_charging == 1
         for: 6h
         annotations:
           summary: "{{ $labels.device_id }} battery will run out within a week"
 
       - alert: TrmnlSilent
-        expr: time() - trmnl_last_seen_timestamp_seconds > 3 * trmnl_refresh_rate_seconds
+        expr: time() - trmnl_last_seen_timestamp_seconds > clamp_min(3 * trmnl_refresh_rate_seconds, 1800)
         for: 15m
         annotations:
           summary: "{{ $labels.device_id }} missed several polls"
@@ -140,7 +142,15 @@ groups:
 
 Tune the trend alert after a few weeks of data: the thresholds depend on the
 battery and on how often the device wakes up. Voltage rises again while
-charging, which is why `TrmnlBatteryTrend` excludes charging devices.
+charging, which is why `TrmnlBatteryTrend` excludes devices that report
+themselves as charging. It uses `unless` rather than `and ... == 0` because
+not every firmware sends a charging header: with `and`, the alert would never
+fire for a device that omits it.
+
+`TrmnlSilent` floors the window at 30 minutes. A device reports its own
+refresh rate, and the server stores what it reports, so the value can be small
+enough that three intervals are shorter than your scrape interval, which would
+make the alert fire permanently.
 
 Telemetry recorded before you enabled scraping stays in the trmnld database and
 is visible in the admin UI; it is not backfilled into Prometheus.
