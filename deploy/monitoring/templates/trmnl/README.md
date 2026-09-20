@@ -56,6 +56,11 @@ minute. The dashboard appears in Grafana as **TRMNL devices**.
 | `TrmnlWifiWeak`        | 6h average RSSI below -80 dBm                             | warning  |
 | `TrmnlServerDown`      | The scrape fails for 10 minutes                           | critical |
 
+Not every firmware reports charging state (`Battery-Charging` /
+`USB-Connected`). Where it is missing, `trmnl_battery_charging` is absent, the
+dashboard's charging panel stays empty, and `TrmnlBatteryTrend` behaves as if
+the device were discharging.
+
 The battery thresholds are a starting point. Voltage swings with load and
 temperature, and the discharge curve is flat for weeks before it drops, so
 watch the dashboard for a few weeks and move the numbers to where they
