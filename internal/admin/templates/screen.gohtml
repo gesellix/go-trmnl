@@ -55,7 +55,9 @@
   </div>
   <div>
     <h2>Preview</h2>
-    {{if $s.RenderedHash.Valid}}
+    {{if .PreviewHash}}
+      <img class="preview" src="{{.BaseURL}}/uploads/{{.PreviewHash}}.png" alt="preview">
+    {{else if $s.RenderedHash.Valid}}
       <img class="preview" src="{{.BaseURL}}/uploads/{{ns $s.RenderedHash}}.png" alt="preview">
     {{else}}
       <p class="muted">Not rendered yet.</p>

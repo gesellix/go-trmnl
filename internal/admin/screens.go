@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -102,6 +103,10 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 		"GlobalDither":     globalDither,
 		"BaseURL":          h.baseURL,
 		"Devices":          devices,
+		// A preview rendered for a specific device is not the screen's shared
+		// image (a battery indicator makes it device-specific), so the preview
+		// handler hands its hash over here instead of through the screen row.
+		"PreviewHash": previewHash(r.URL.Query().Get("preview"), h.uploadsDir),
 	}
 	if pluginType == "familycalendar" {
 		h.addFamilyCalendarSettings(data, sc.SettingsJSON)
@@ -216,11 +221,12 @@ func (h *Handler) ScreenPreview(w http.ResponseWriter, r *http.Request) {
 	if devID, ok := parseInt64(r.FormValue("device_id")); ok {
 		d, _ = h.store.GetDeviceByID(devID)
 	}
-	if _, rerr := screens.Render(r.Context(), h.store, h.renderer, h.assetsDir, d, sc, h.ditherModeFor(sc)); rerr != nil {
+	res, rerr := screens.Render(r.Context(), h.store, h.renderer, h.assetsDir, d, sc, h.ditherModeFor(sc))
+	if rerr != nil {
 		http.Error(w, "render failed: "+rerr.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/screens/"+chiID(r), http.StatusFound)
+	http.Redirect(w, r, "/admin/screens/"+chiID(r)+"?preview="+url.QueryEscape(res.Hash), http.StatusFound)
 }
 
 // ScreenUpload stores an uploaded image asset and points the (staticimage)
@@ -346,4 +352,21 @@ func randomName() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// previewHash validates a hash coming from the query string and confirms the
+// image exists, so the page never builds a URL out of arbitrary input.
+func previewHash(hash, uploadsDir string) string {
+	if len(hash) != 32 {
+		return ""
+	}
+	for _, c := range hash {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return ""
+		}
+	}
+	if _, err := os.Stat(filepath.Join(uploadsDir, hash+".png")); err != nil {
+		return ""
+	}
+	return hash
 }
