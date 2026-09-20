@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/calendar"
 	"github.com/gesellix/go-trmnl/internal/config"
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
+	"github.com/gesellix/go-trmnl/internal/metrics"
 	"github.com/gesellix/go-trmnl/internal/plugins"
 	"github.com/gesellix/go-trmnl/internal/plugins/familycalendar"
 	"github.com/gesellix/go-trmnl/internal/secret"
@@ -31,6 +33,7 @@ import (
 	"github.com/gesellix/go-trmnl/internal/store"
 	"github.com/gesellix/go-trmnl/internal/tlscert"
 	"github.com/gesellix/go-trmnl/internal/uploads"
+	"github.com/go-chi/chi/v5"
 
 	// Register built-in screen plugins.
 	_ "github.com/gesellix/go-trmnl/internal/plugins/clock"
@@ -107,6 +110,11 @@ func run() error {
 		Password: cfg.AdminPassword,
 	}, cal).WithHTTPS(cfg.HTTPSListenAddr, tlsSrc).Routes(r)
 
+	// Prometheus metrics: on the regular listener(s) by default, or on their own
+	// address. Credentials are separate from the admin ones so a scraper does
+	// not need admin access.
+	metricsListener := setupMetrics(cfg, st, r)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -130,7 +138,39 @@ func run() error {
 			log.Printf("trmnld HTTPS listening on %s (certificate %s)", cfg.HTTPSListenAddr, cfg.TLSCertFile)
 		}
 	}
+	if metricsListener != nil {
+		listeners = append(listeners, *metricsListener)
+		log.Printf("trmnld metrics listening on %s/metrics", metricsListener.Addr)
+	}
 	return server.Run(ctx, r, listeners...)
+}
+
+// setupMetrics mounts /metrics on the main router, or, when -metrics-listen is
+// set, returns a dedicated listener serving only /metrics. It returns nil when
+// metrics are disabled.
+func setupMetrics(cfg *config.Config, st *store.Store, r chi.Router) *server.Listener {
+	if cfg.DisableMetrics {
+		return nil
+	}
+	h := metrics.New(st, version, metrics.Auth{User: cfg.MetricsUser, Password: cfg.MetricsPassword})
+	if cfg.MetricsPassword == "" && !loopbackAddr(cfg.MetricsListenAddr) {
+		log.Printf("WARNING: /metrics authentication is disabled (set -metrics-password or TRMNL_METRICS_PASSWORD)")
+	}
+	if cfg.MetricsListenAddr == "" {
+		h.Routes(r)
+		return nil
+	}
+	return &server.Listener{Addr: cfg.MetricsListenAddr, Handler: h.Mux()}
+}
+
+// loopbackAddr reports whether addr binds to a loopback address only.
+func loopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return host == "localhost" || (ip != nil && ip.IsLoopback())
 }
 
 // newTLSSource returns the HTTPS certificate source, or nil when HTTPS is off.

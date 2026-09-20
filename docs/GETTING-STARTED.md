@@ -309,6 +309,10 @@ All settings are flags or environment variables (flags win):
 | `-log-retention`    | `TRMNL_LOG_RETENTION`    | `32d`                 | How long to keep device logs (e.g. `32d`, `720h`); `0` disables                          |
 | `-secret-key`       | `TRMNL_SECRET_KEY`       | auto-generated        | Key to encrypt stored credentials at rest; default is a key generated under the data dir |
 | `-no-encryption`    | `TRMNL_NO_ENCRYPTION`    | `false`               | Store credentials in plaintext instead of encrypting them                                |
+| `-no-metrics`       | `TRMNL_NO_METRICS`       | `false`               | Disable the Prometheus `/metrics` endpoint, see [Metrics](#metrics)                      |
+| `-metrics-listen`   | `TRMNL_METRICS_LISTEN`   | (empty)               | Serve `/metrics` on its own address (e.g. `127.0.0.1:9090`)                              |
+| `-metrics-user`     | `TRMNL_METRICS_USER`     | `metrics`             | Basic Auth username for `/metrics`                                                       |
+| `-metrics-password` | `TRMNL_METRICS_PASSWORD` | (empty)               | Basic Auth password for `/metrics`; empty disables auth                                  |
 
 Dithering mode (Floyd-Steinberg vs. threshold) is set in **Admin → Settings**.
 Google OAuth clients and calendar accounts are configured entirely in
@@ -354,6 +358,16 @@ is not used in this mode.
 
 Binding to port 443 needs root or the `CAP_NET_BIND_SERVICE` capability (the
 Raspberry Pi installer's systemd unit grants it).
+
+### Metrics
+
+Prometheus metrics are exposed at `/metrics` on the regular listener, on by
+default and unauthenticated unless you set `-metrics-password`. They cover
+per-device battery voltage, charging state, WiFi signal, refresh rate and
+last-seen timestamp, read from the database at scrape time.
+`-metrics-listen` moves the endpoint to its own port, `-no-metrics` turns it
+off. Full metric list, scrape config and alerting rules:
+**[Monitoring](MONITORING.md)**.
 
 ### Credential encryption
 

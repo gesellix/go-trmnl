@@ -31,10 +31,12 @@ func New() *chi.Mux {
 }
 
 // Listener describes one address the server binds to. A non-nil TLS config
-// serves HTTPS on it.
+// serves HTTPS on it. A non-nil Handler serves that listener instead of the
+// one passed to Run (used to keep /metrics off the device-facing port).
 type Listener struct {
-	Addr string
-	TLS  *tls.Config
+	Addr    string
+	TLS     *tls.Config
+	Handler http.Handler
 }
 
 // Run serves handler on every listener until ctx is cancelled, then shuts all
@@ -44,9 +46,13 @@ func Run(ctx context.Context, handler http.Handler, listeners ...Listener) error
 	servers := make([]*http.Server, 0, len(listeners))
 	errCh := make(chan error, len(listeners))
 	for _, l := range listeners {
+		h := handler
+		if l.Handler != nil {
+			h = l.Handler
+		}
 		srv := &http.Server{
 			Addr:              l.Addr,
-			Handler:           handler,
+			Handler:           h,
 			TLSConfig:         l.TLS,
 			ReadHeaderTimeout: 10 * time.Second,
 			// WriteTimeout bounds slow/stuck responses (image downloads are small
