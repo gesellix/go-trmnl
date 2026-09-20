@@ -5,13 +5,13 @@ and dashboards in five containers. Nothing in it is go-trmnl specific; the
 go-trmnl bits are a template you install on top (see
 [templates/trmnl](templates/trmnl/README.md)).
 
-| Container | Image | Job |
-|-----------|-------|-----|
-| victoriametrics | `victoriametrics/victoria-metrics` | Scrapes the targets and stores the samples |
-| vmalert | `victoriametrics/vmalert` | Evaluates the alert rules |
-| alertmanager | `prom/alertmanager` | Groups, silences and routes alerts |
-| ntfy-alertmanager | `xenrox/ntfy-alertmanager` | Turns alerts into readable ntfy push messages |
-| grafana | `grafana/grafana-oss` | Dashboards |
+| Container         | Image                              | Job                                           |
+|-------------------|------------------------------------|-----------------------------------------------|
+| victoriametrics   | `victoriametrics/victoria-metrics` | Scrapes the targets and stores the samples    |
+| vmalert           | `victoriametrics/vmalert`          | Evaluates the alert rules                     |
+| alertmanager      | `prom/alertmanager`                | Groups, silences and routes alerts            |
+| ntfy-alertmanager | `xenrox/ntfy-alertmanager`         | Turns alerts into readable ntfy push messages |
+| grafana           | `grafana/grafana-oss`              | Dashboards (optional, `dashboards` profile)   |
 
 VictoriaMetrics does the scraping itself, so there is no separate agent. It
 speaks PromQL and the Prometheus scrape config format: anything written for
@@ -44,7 +44,9 @@ $EDITOR alertmanager/ntfy-alertmanager.scfg   # set your ntfy topic
 docker compose up -d
 ```
 
-Grafana is then at `http://<host>:3000`. VictoriaMetrics (`:8428`), vmalert
+Grafana is then at `http://<host>:3000`. It runs in the `dashboards` Compose
+profile, which `.env.example` enables through `COMPOSE_PROFILES`; without that
+line the other four services come up alone. VictoriaMetrics (`:8428`), vmalert
 (`:8880`) and Alertmanager (`:9093`) bind to localhost only by default; set
 `VM_ADDR=0.0.0.0` in `.env` to reach their web UIs from the LAN.
 
@@ -67,6 +69,46 @@ To use something else (email, Gotify, a webhook), replace the `ntfy` receiver
 in `alertmanager/alertmanager.yml` with any
 [Alertmanager receiver](https://prometheus.io/docs/alerting/latest/configuration/#receiver)
 and drop the `ntfy-alertmanager` service from `compose.yaml`.
+
+## Adding targets
+
+The stack is generic: go-trmnl is one target among whatever else you run.
+A target is a file in `victoriametrics/conf.d/`, holding normal Prometheus
+`scrape_config` entries:
+
+```yaml
+# victoriametrics/conf.d/nas.yml
+- job_name: node
+  static_configs:
+    - targets: ["node-exporter:9100", "192.168.1.11:9100"]
+      labels:
+        host: nas
+```
+
+VictoriaMetrics rereads the directory once a minute, so nothing needs
+restarting. Anything the target exposes is then queryable, and the stack's own
+`TargetDown` rule covers it without extra configuration; add alerts for it as
+another file in `vmalert/rules/`, and a dashboard as JSON in
+`grafana/dashboards/` (community dashboards from grafana.com work: download
+the JSON, drop it in, and it binds to the provisioned datasource).
+
+Host metrics are the usual first addition. Running the exporter next to the
+stack covers the machine the stack runs on:
+
+```yaml
+# in compose.yaml
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.12.1
+    restart: unless-stopped
+    command: ["--path.rootfs=/host"]
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    expose: ["9100"]
+```
+
+Credentials belong in `scrape.env` as `%{VAR_NAME}`, never inline in a conf.d
+file; see [templates/trmnl](templates/trmnl/README.md) for a worked example.
 
 ## Layout
 
@@ -96,18 +138,17 @@ VictoriaMetrics container only, and are referenced in scrape configs as
 
 Measured with one go-trmnl server and one device, idle, on a 64-bit host:
 
-| | Memory | CPU (idle) | Image on disk | Download (arm64) |
-|---|---|---|---|---|
-| victoriametrics | 120 MB | 0.2% | 54 MB | 18 MB |
-| vmalert | 16 MB | 0.3% | 53 MB | 18 MB |
-| alertmanager | 17 MB | 0.1% | 117 MB | 38 MB |
-| ntfy-alertmanager | 6 MB | 0.0% | 42 MB | 12 MB |
-| grafana | 146 MB | 0.6% | 1.4 GB | 328 MB |
-| **total** | **~305 MB** | **~1%** | **~1.7 GB** | **~415 MB** |
+|                       | Memory      | CPU (idle) | Image on disk | Download (arm64) |
+|-----------------------|-------------|------------|---------------|------------------|
+| victoriametrics       | 120 MB      | 0.2%       | 54 MB         | 18 MB            |
+| vmalert               | 16 MB       | 0.3%       | 53 MB         | 18 MB            |
+| alertmanager          | 17 MB       | 0.1%       | 117 MB        | 38 MB            |
+| ntfy-alertmanager     | 6 MB        | 0.0%       | 42 MB         | 12 MB            |
+| grafana               | 146 MB      | 0.6%       | 1.4 GB        | 328 MB           |
+| **total**             | **~305 MB** | **~1%**    | **~1.7 GB**   | **~415 MB**      |
+| total without Grafana | ~160 MB     | ~0.6%      | ~265 MB       | ~85 MB           |
 
-Grafana is two thirds of the download and half the memory. Leaving it out and
-using the built-in VictoriaMetrics UI (`http://<host>:8428/vmui`) turns this
-into a ~160 MB stack.
+Grafana is two thirds of the download and half the memory.
 
 **Data growth.** The stack stores roughly 760k samples a day: the three
 self-monitoring jobs contribute ~2300 series at a 5 minute interval, go-trmnl
@@ -136,6 +177,26 @@ curl -s localhost:8428/api/v1/status/tsdb    # series counts
 Dropping the Go runtime metrics of a scrape target cuts most of its series;
 `templates/trmnl/scrape/trmnl.yml` has the three-line `metric_relabel_configs`
 for it, commented out.
+
+## Small hosts
+
+A NAS or a Pi 4/5 runs the whole stack comfortably. A 512 MB board, such as a
+Raspberry Pi Zero 2 W, does not: the stack alone needs ~305 MB, plus the Docker
+daemon, the OS and whatever the board is actually there for.
+
+**Preferably, run the stack elsewhere and scrape the small board over the
+network.** Being scraped costs it one HTTP request per interval. Monitoring
+from a different machine also survives that board failing, which is the
+situation you most want to be told about.
+
+If it has to run locally, leave Grafana out. Remove `dashboards` from
+`COMPOSE_PROFILES` in `.env` (or run
+`docker compose up -d victoriametrics vmalert alertmanager ntfy-alertmanager`)
+and query through vmui at `http://<host>:8428/vmui`, which is served by
+VictoriaMetrics itself. That is the ~160 MB row above and fits in 512 MB, with
+two caveats: there is no headroom, so an out-of-memory kill can take down
+whatever else the board runs, and VictoriaMetrics writes continuously, which
+wears an SD card. Prefer a USB SSD, or shorten `VM_RETENTION`.
 
 ## Operating it
 
