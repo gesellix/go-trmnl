@@ -1,0 +1,22 @@
+# go-trmnl device metrics.
+#
+# TRMNL_TARGET, TRMNL_METRICS_USER and TRMNL_METRICS_PASSWORD come from the
+# stack's .env file. Delete the basic_auth block if you run /metrics without
+# a password.
+- job_name: trmnl
+  # The device polls every 15 minutes by default; scraping faster than that
+  # only repeats the same values.
+  scrape_interval: 60s
+  metrics_path: /metrics
+  basic_auth:
+    username: "%{TRMNL_METRICS_USER}"
+    password: "%{TRMNL_METRICS_PASSWORD}"
+  static_configs:
+    - targets: ["%{TRMNL_TARGET}"]
+  # The endpoint also exports Go runtime and process metrics for trmnld itself
+  # (~50 series). They are useful when debugging the server; uncomment to drop
+  # them and keep only the device metrics.
+  #metric_relabel_configs:
+  #  - source_labels: [__name__]
+  #    regex: "(go|process)_.*"
+  #    action: drop

@@ -1,0 +1,70 @@
+# Alerts for TRMNL devices served by go-trmnl.
+#
+# Battery voltage is noisy: the reading depends on what the device was doing
+# when it measured, so the thresholds work on a smoothed value. The discharge
+# curve is flat in the middle and drops steeply at the end, which is why the
+# trend rule is paired with an absolute threshold. Tune both after a few weeks
+# of data; they depend on the battery and on how often the device wakes up.
+
+groups:
+  - name: trmnl
+    rules:
+      - alert: TrmnlBatteryLow
+        expr: avg_over_time(trmnl_battery_voltage_volts[6h]) < 3.4
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device_id }}: battery low ({{ $value | printf \"%.2f\" }} V)"
+          description: "Six-hour average below 3.4 V. Charge it in the next few days."
+
+      - alert: TrmnlBatteryCritical
+        expr: avg_over_time(trmnl_battery_voltage_volts[6h]) < 3.3
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device_id }}: battery nearly empty ({{ $value | printf \"%.2f\" }} V)"
+          description: "Six-hour average below 3.3 V. The display stops updating soon."
+
+      - alert: TrmnlBatteryTrend
+        expr: |
+          predict_linear(trmnl_battery_voltage_volts[7d], 7 * 86400) < 3.3
+            and avg_over_time(trmnl_battery_voltage_volts[6h]) < 3.7
+            and trmnl_battery_charging == 0
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device_id }}: battery runs out within a week"
+          description: "Extrapolated from the last 7 days, while not charging."
+
+      # trmnl_last_seen_timestamp_seconds is the last /api/display poll. Three
+      # missed polls in a row means the device is off, asleep or off the WiFi.
+      - alert: TrmnlSilent
+        expr: time() - trmnl_last_seen_timestamp_seconds > 3 * trmnl_refresh_rate_seconds
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device_id }} has missed several polls"
+          description: "Last seen {{ $value | humanizeDuration }} ago."
+
+      - alert: TrmnlWifiWeak
+        expr: avg_over_time(trmnl_wifi_rssi_dbm[6h]) < -80
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device_id }}: weak WiFi ({{ $value | printf \"%.0f\" }} dBm)"
+          description: "A weak signal costs battery, because the radio stays on longer."
+
+      # The server itself. Without it no device can refresh.
+      - alert: TrmnlServerDown
+        expr: up{job="trmnl"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "go-trmnl is not reachable"
+          description: "{{ $labels.instance }} has not answered a scrape for 10 minutes."

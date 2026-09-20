@@ -1,0 +1,9 @@
+# Local configuration, never committed.
+.env
+scrape.env
+
+# Installed by add-template.sh; the sources live under templates/.
+victoriametrics/conf.d/*.yml
+grafana/dashboards/*.json
+vmalert/rules/*.yml
+!vmalert/rules/stack.yml

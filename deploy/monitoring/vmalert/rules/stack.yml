@@ -1,0 +1,33 @@
+# Rules for the stack itself. Template rules are installed next to this file.
+groups:
+  - name: stack
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} ({{ $labels.instance }}) cannot be scraped"
+          description: "No successful scrape for 10 minutes."
+
+      - alert: ScrapePoolEmpty
+        expr: absent(up{job="victoriametrics"})
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VictoriaMetrics is not scraping itself"
+          description: "The scrape configuration is probably broken."
+
+      - alert: DiskFillingUp
+        expr: |
+          vm_free_disk_space_bytes / ignoring(path)
+            (vm_data_size_bytes{type="storage/inmemory"} + vm_data_size_bytes{type="storage/small"}
+             + vm_data_size_bytes{type="storage/big"} + vm_free_disk_space_bytes) < 0.1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 10% free space left for metrics storage"
+          description: "Lower VM_RETENTION or make room on the data volume."

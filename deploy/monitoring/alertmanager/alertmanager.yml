@@ -1,0 +1,41 @@
+# Alert routing. Everything goes to ntfy through the ntfy-alertmanager bridge;
+# see ntfy-alertmanager.scfg for the topic and server.
+
+global:
+  # An alert stops firing when its rule stops matching; this is the fallback
+  # for alerts whose source disappears entirely.
+  resolve_timeout: 10m
+
+route:
+  receiver: ntfy
+  # One notification per alert name and instance, so a flapping device does not
+  # bury everything else.
+  group_by: ["alertname", "device_id", "instance"]
+  group_wait: 1m
+  group_interval: 10m
+  # Home lab pacing: a still-firing alert repeats twice a day, not hourly.
+  repeat_interval: 12h
+  routes:
+    - matchers: ['severity = "critical"']
+      receiver: ntfy
+      group_wait: 0s
+      repeat_interval: 4h
+
+receivers:
+  - name: ntfy
+    webhook_configs:
+      - url: "http://ntfy-alertmanager:8080"
+        send_resolved: true
+
+inhibit_rules:
+  # While something critical is happening to a device, stay quiet about its
+  # warnings (a nearly empty battery also trips the "battery low" rule).
+  # Alertmanager treats a label missing on both sides as equal, so a critical
+  # alert without a device_id also mutes warnings without one.
+  - source_matchers: ['severity = "critical"']
+    target_matchers: ['severity = "warning"']
+    equal: ["device_id"]
+  # A device that cannot be scraped at all makes its other alerts meaningless.
+  - source_matchers: ['alertname = "TargetDown"']
+    target_matchers: ['severity =~ "warning|critical"']
+    equal: ["instance"]

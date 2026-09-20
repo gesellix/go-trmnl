@@ -1,0 +1,31 @@
+# Base scrape configuration.
+#
+# Targets live in conf.d/*.yml, one file per thing you monitor, each a normal
+# Prometheus scrape_config entry. Add or edit a file and VictoriaMetrics picks
+# it up within a minute; no restart needed.
+
+global:
+  scrape_interval: 60s
+  scrape_timeout: 15s
+
+scrape_config_files:
+  - /etc/victoriametrics/conf.d/*.yml
+
+scrape_configs:
+  # The stack watching itself. These three expose ~2300 series between them,
+  # far more than a handful of devices, so they are sampled every 5 minutes:
+  # enough to notice a container is down, cheap to store for years.
+  - job_name: victoriametrics
+    scrape_interval: 5m
+    static_configs:
+      - targets: ["victoriametrics:8428"]
+
+  - job_name: vmalert
+    scrape_interval: 5m
+    static_configs:
+      - targets: ["vmalert:8880"]
+
+  - job_name: alertmanager
+    scrape_interval: 5m
+    static_configs:
+      - targets: ["alertmanager:9093"]

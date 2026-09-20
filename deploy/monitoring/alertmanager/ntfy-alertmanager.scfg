@@ -1,0 +1,45 @@
+# Bridge between Alertmanager and ntfy (scfg format).
+# Docs: https://codeberg.org/xenrox/ntfy-alertmanager
+
+http-address :8080
+log-level info
+
+# One notification per alert rather than one per Alertmanager group.
+alert-mode single
+
+ntfy {
+    # Public server, or your own (e.g. http://ntfy.fritz.box:8080).
+    server https://ntfy.sh
+
+    # CHANGE THIS. On the public server the topic is the only thing protecting
+    # your notifications: anyone who knows the name can read and post to it.
+    # Pick something long and random, then subscribe to it in the ntfy app.
+    topic go-trmnl-CHANGE-ME-8f3a1c
+
+    markdown true
+}
+
+labels {
+    order "severity"
+
+    severity "critical" {
+        priority 5
+        tags "rotating_light"
+    }
+
+    severity "warning" {
+        priority 3
+        tags "warning"
+    }
+}
+
+resolved {
+    tags "white_check_mark"
+    priority 1
+}
+
+# Suppresses repeats of an alert that is already on your phone.
+cache {
+    type memory
+    duration 24h
+}
