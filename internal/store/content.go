@@ -138,6 +138,26 @@ func (s *Store) SetDeviceScreenRender(deviceID, screenID int64, hash string, bat
 	return err
 }
 
+// RenderHashExists reports whether a hash is one this server rendered, across
+// the shared per-screen cache and the per-device one. It lets callers check a
+// hash that came from a request without touching the filesystem with it.
+func (s *Store) RenderHashExists(hash string) (bool, error) {
+	if hash == "" {
+		return false, nil
+	}
+	var one int
+	err := s.db.QueryRow(`SELECT 1 FROM screens WHERE rendered_hash = ?
+		UNION SELECT 1 FROM device_screen_renders WHERE rendered_hash = ? LIMIT 1`,
+		hash, hash).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // LatestDeviceRender returns the most recent per-device render for a device,
 // which is what that device was last served when it renders its own images.
 func (s *Store) LatestDeviceRender(deviceID int64) (hash string, ok bool, err error) {

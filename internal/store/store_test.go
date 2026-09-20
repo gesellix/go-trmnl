@@ -448,3 +448,38 @@ func TestDeviceScreenRenders(t *testing.T) {
 		t.Error("entry survived ClearDeviceRenders")
 	}
 }
+
+// RenderHashExists is what the admin uses to decide whether a hash from a
+// request may be echoed back into a page, so it must see both caches.
+func TestRenderHashExists(t *testing.T) {
+	st := openTest(t)
+	d := newDevice(t, st, "AA:BB:CC:DD:EE:09")
+	pg, err := st.CreatePlugin("clock", "Clock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := st.CreateScreen(pg.ID, "Clock", `{}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, unknown := range []string{"", "deadbeef", "0123456789abcdef0123456789abcdef"} {
+		if ok, err := st.RenderHashExists(unknown); err != nil || ok {
+			t.Errorf("RenderHashExists(%q) = %v (err %v), want false", unknown, ok, err)
+		}
+	}
+
+	if err := st.SetScreenRendered(sc.ID, "shared-hash"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := st.RenderHashExists("shared-hash"); err != nil || !ok {
+		t.Errorf("shared render not found: %v (err %v)", ok, err)
+	}
+
+	if err := st.SetDeviceScreenRender(d.ID, sc.ID, "device-hash", 4); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := st.RenderHashExists("device-hash"); err != nil || !ok {
+		t.Errorf("per-device render not found: %v (err %v)", ok, err)
+	}
+}
