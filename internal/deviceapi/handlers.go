@@ -162,6 +162,7 @@ func (h *Handler) Log(w http.ResponseWriter, r *http.Request) {
 }
 
 // telemetryFromHeaders extracts the device telemetry sent on the display poll.
+// The Refresh-Rate header is ignored on purpose; see store.Telemetry.
 func telemetryFromHeaders(r *http.Request) store.Telemetry {
 	t := store.Telemetry{
 		FWVersion:      nullStr(r.Header.Get("FW-Version")),
@@ -170,7 +171,6 @@ func telemetryFromHeaders(r *http.Request) store.Telemetry {
 		Height:         nullInt(r.Header.Get("Height")),
 		BatteryVoltage: nullFloat(r.Header.Get("Battery-Voltage")),
 		RSSI:           nullInt(r.Header.Get("RSSI")),
-		RefreshRate:    nullInt(r.Header.Get("Refresh-Rate")),
 	}
 	// The firmware reports charging state via either Battery-Charging or
 	// USB-Connected depending on board.
