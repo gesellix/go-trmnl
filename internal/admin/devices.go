@@ -46,10 +46,13 @@ func (h *Handler) DeviceDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	playlists, _ := h.store.ListPlaylists()
 
-	// Preview thumbnail: the first visible screen of the assigned playlist, if
-	// it has been rendered.
+	// Preview thumbnail: what this device was last served. A device drawing the
+	// battery indicator has its own renders, which is the picture on its panel;
+	// otherwise fall back to the first screen of the assigned playlist.
 	var previewHash string
-	if d.PlaylistID.Valid {
+	if hash, ok, _ := h.store.LatestDeviceRender(d.ID); ok {
+		previewHash = hash
+	} else if d.PlaylistID.Valid {
 		if items, _ := h.store.ListPlaylistItems(d.PlaylistID.Int64); len(items) > 0 {
 			if sc, err := h.store.GetScreen(items[0].ScreenID); err == nil && sc.RenderedHash.Valid {
 				previewHash = sc.RenderedHash.String
@@ -137,6 +140,9 @@ func (h *Handler) DeviceForceRefresh(w http.ResponseWriter, r *http.Request) {
 			_ = h.store.ClearScreenRendered(it.ScreenID)
 		}
 	}
+	// Per-device renders are a separate cache; without this a device drawing
+	// the battery indicator would keep serving its old image.
+	_ = h.store.ClearDeviceRenders(d.ID)
 	http.Redirect(w, r, "/admin/devices/"+chiID(r), http.StatusFound)
 }
 

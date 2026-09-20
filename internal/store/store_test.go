@@ -387,3 +387,64 @@ func TestUpdateTelemetryKeepsRefreshRate(t *testing.T) {
 		t.Errorf("battery not persisted: %+v", got.BatteryVoltage)
 	}
 }
+
+// Devices drawing the battery indicator render their own images, so their
+// cache is separate from the screens' shared one, and both must survive the
+// image sweeper.
+func TestDeviceScreenRenders(t *testing.T) {
+	st := openTest(t)
+	d := newDevice(t, st, "AA:BB:CC:DD:EE:08")
+	pg, err := st.CreatePlugin("clock", "Clock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := st.CreateScreen(pg.ID, "Clock", `{}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, _, ok, err := st.DeviceScreenRender(d.ID, sc.ID); err != nil || ok {
+		t.Fatalf("expected no entry yet: ok=%v err=%v", ok, err)
+	}
+	if err := st.SetDeviceScreenRender(d.ID, sc.ID, "hash-a", 8); err != nil {
+		t.Fatal(err)
+	}
+	hash, at, state, ok, err := st.DeviceScreenRender(d.ID, sc.ID)
+	if err != nil || !ok || hash != "hash-a" || state != 8 || at == 0 {
+		t.Fatalf("got %q/%d/%d ok=%v err=%v", hash, at, state, ok, err)
+	}
+
+	// Re-rendering replaces the entry rather than adding one.
+	if err := st.SetDeviceScreenRender(d.ID, sc.ID, "hash-b", 6); err != nil {
+		t.Fatal(err)
+	}
+	if hash, _, state, _, _ := st.DeviceScreenRender(d.ID, sc.ID); hash != "hash-b" || state != 6 {
+		t.Errorf("not replaced: %q/%d", hash, state)
+	}
+
+	if latest, ok, _ := st.LatestDeviceRender(d.ID); !ok || latest != "hash-b" {
+		t.Errorf("LatestDeviceRender = %q (ok=%v), want hash-b", latest, ok)
+	}
+
+	// The sweeper must not delete an image only a device references.
+	hashes, err := st.ActiveRenderHashes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, h := range hashes {
+		if h == "hash-b" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("per-device hash missing from ActiveRenderHashes: %v", hashes)
+	}
+
+	if err := st.ClearDeviceRenders(d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, ok, _ := st.DeviceScreenRender(d.ID, sc.ID); ok {
+		t.Error("entry survived ClearDeviceRenders")
+	}
+}

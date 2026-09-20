@@ -138,6 +138,27 @@ func (s *Store) SetDeviceScreenRender(deviceID, screenID int64, hash string, bat
 	return err
 }
 
+// LatestDeviceRender returns the most recent per-device render for a device,
+// which is what that device was last served when it renders its own images.
+func (s *Store) LatestDeviceRender(deviceID int64) (hash string, ok bool, err error) {
+	err = s.db.QueryRow(`SELECT rendered_hash FROM device_screen_renders
+		WHERE device_id = ? ORDER BY rendered_at DESC LIMIT 1`, deviceID).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return hash, hash != "", nil
+}
+
+// ClearDeviceRenders drops a device's cached renders, forcing a fresh draw on
+// its next poll.
+func (s *Store) ClearDeviceRenders(deviceID int64) error {
+	_, err := s.db.Exec(`DELETE FROM device_screen_renders WHERE device_id = ?`, deviceID)
+	return err
+}
+
 // ActiveRenderHashes returns the distinct, currently-referenced render hashes
 // across all screens and per-device renders, used to decide which cached image
 // files to keep.
