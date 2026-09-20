@@ -106,7 +106,7 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 		// A preview rendered for a specific device is not the screen's shared
 		// image (a battery indicator makes it device-specific), so the preview
 		// handler hands its hash over here instead of through the screen row.
-		"PreviewHash": previewHash(r.URL.Query().Get("preview"), h.uploadsDir),
+		"PreviewHash": h.previewHash(r.URL.Query().Get("preview")),
 	}
 	if pluginType == "familycalendar" {
 		h.addFamilyCalendarSettings(data, sc.SettingsJSON)
@@ -226,7 +226,10 @@ func (h *Handler) ScreenPreview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "render failed: "+rerr.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/screens/"+chiID(r)+"?preview="+url.QueryEscape(res.Hash), http.StatusFound)
+	// The target is built from the parsed id and a hash this server produced,
+	// not from request data; the rule flags every non-literal redirect.
+	// nosemgrep: go.lang.security.injection.open-redirect.open-redirect
+	http.Redirect(w, r, screenPath(id)+"?preview="+url.QueryEscape(res.Hash), http.StatusFound)
 }
 
 // ScreenUpload stores an uploaded image asset and points the (staticimage)
@@ -354,9 +357,15 @@ func randomName() string {
 	return hex.EncodeToString(b)
 }
 
-// previewHash validates a hash coming from the query string and confirms the
-// image exists, so the page never builds a URL out of arbitrary input.
-func previewHash(hash, uploadsDir string) string {
+// screenPath builds an admin URL from an id the handler already parsed, so no
+// request data reaches the redirect target.
+func screenPath(id int64) string { return "/admin/screens/" + strconv.FormatInt(id, 10) }
+
+// previewHash echoes a hash from the query string only if this server rendered
+// it. The check is a database lookup rather than a file lookup: the value is
+// then known-good before it is ever used to build a URL, and no request data
+// reaches the filesystem.
+func (h *Handler) previewHash(hash string) string {
 	if len(hash) != 32 {
 		return ""
 	}
@@ -365,7 +374,7 @@ func previewHash(hash, uploadsDir string) string {
 			return ""
 		}
 	}
-	if _, err := os.Stat(filepath.Join(uploadsDir, hash+".png")); err != nil {
+	if ok, err := h.store.RenderHashExists(hash); err != nil || !ok {
 		return ""
 	}
 	return hash
