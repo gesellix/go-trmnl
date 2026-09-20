@@ -28,6 +28,9 @@ server, renders the returned 800x480 1-bit image, then sleeps for its
 - **Show a family calendar** merged from multiple **Google** and **Apple
   iCloud / CalDAV** accounts, deduplicated across people, with credentials
   encrypted at rest.
+- **Scrape it with Prometheus** at `/metrics`: battery voltage, WiFi signal,
+  last-seen timestamps per device, ready for Grafana dashboards and low-battery
+  alerts.
 - Run it as a **single static binary** (or one small container) on anything
   down to a Raspberry Pi.
 
@@ -71,14 +74,15 @@ Full walkthrough: **[Getting started](docs/GETTING-STARTED.md)**.
 
 Flags or environment variables (flags win). The essentials:
 
-| Flag              | Env                    | Default        | Purpose                                        |
-|-------------------|------------------------|----------------|------------------------------------------------|
-| `-base-url`       | `TRMNL_BASE_URL`       | auto (LAN IP)  | Public URL the device uses to reach the server |
-| `-data-dir`       | `TRMNL_DATA_DIR`       | `./data`       | Root for the SQLite database and uploads       |
-| `-admin-password` | `TRMNL_ADMIN_PASSWORD` | (empty)        | Admin UI password; empty disables auth         |
-| `-secret-key`     | `TRMNL_SECRET_KEY`     | auto-generated | Key to encrypt stored credentials at rest      |
-| `-no-encryption`  | `TRMNL_NO_ENCRYPTION`  | `false`        | Store credentials in plaintext                 |
-| `-https-listen`   | `TRMNL_HTTPS_LISTEN`   | (empty)        | Optional HTTPS listener for the admin UI       |
+| Flag                | Env                      | Default        | Purpose                                        |
+|---------------------|--------------------------|----------------|------------------------------------------------|
+| `-base-url`         | `TRMNL_BASE_URL`         | auto (LAN IP)  | Public URL the device uses to reach the server |
+| `-data-dir`         | `TRMNL_DATA_DIR`         | `./data`       | Root for the SQLite database and uploads       |
+| `-admin-password`   | `TRMNL_ADMIN_PASSWORD`   | (empty)        | Admin UI password; empty disables auth         |
+| `-secret-key`       | `TRMNL_SECRET_KEY`       | auto-generated | Key to encrypt stored credentials at rest      |
+| `-no-encryption`    | `TRMNL_NO_ENCRYPTION`    | `false`        | Store credentials in plaintext                 |
+| `-https-listen`     | `TRMNL_HTTPS_LISTEN`     | (empty)        | Optional HTTPS listener for the admin UI       |
+| `-metrics-password` | `TRMNL_METRICS_PASSWORD` | (empty)        | Basic Auth password for `/metrics`             |
 
 Sensitive stored credentials are **encrypted at rest by default** (the calendar
 plugin's OAuth tokens, CalDAV passwords and OAuth client secrets are the first
@@ -88,7 +92,8 @@ re-entering those credentials. Pass `-no-encryption` to store plaintext instead.
 
 The `/admin` UI uses HTTP Basic Auth when a password is set. Device endpoints
 (`/api/*`) and `/uploads` are unauthenticated, since the firmware cannot supply
-credentials. See [Getting started](docs/GETTING-STARTED.md#configuration) for
+credentials. Prometheus metrics are served at `/metrics` with their own
+credentials (or on their own port); see [Monitoring](docs/MONITORING.md). See [Getting started](docs/GETTING-STARTED.md#configuration) for
 the complete list (listen address, DB/uploads paths, cleanup and log-retention
 intervals, etc.).
 
@@ -99,6 +104,8 @@ intervals, etc.).
 - **[Plugins reference](docs/PLUGINS.md)** — built-in screens, their settings,
   and how to add your own. Calendar setup (Google OAuth, Apple/CalDAV) is in the
   [Family Calendar page](docs/plugins/familycalendar.md).
+- **[Monitoring](docs/MONITORING.md)** — the Prometheus `/metrics` endpoint,
+  what it exports, and example scrape and alerting rules.
 - **[Device API reference](docs/API.md)** — the firmware-facing endpoints,
   headers and responses.
 - **[Design notes](docs/PLAN.md)** — architecture and how the server is built.

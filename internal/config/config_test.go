@@ -180,3 +180,36 @@ func TestHTTPSSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestMetricsSettings(t *testing.T) {
+	unsetEnv(t, "TRMNL_NO_METRICS", "TRMNL_METRICS_LISTEN", "TRMNL_METRICS_USER", "TRMNL_METRICS_PASSWORD")
+	base := []string{"-base-url", "http://192.168.1.10:8080", "-data-dir", "/tmp/x"}
+
+	c, err := config.Load(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DisableMetrics || c.MetricsListenAddr != "" || c.MetricsUser != "metrics" || c.MetricsPassword != "" {
+		t.Errorf("metrics defaults wrong: %+v", c)
+	}
+
+	t.Setenv("TRMNL_METRICS_LISTEN", " 127.0.0.1:9090 ")
+	t.Setenv("TRMNL_METRICS_PASSWORD", "s3cret")
+	c, err = config.Load(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.MetricsListenAddr != "127.0.0.1:9090" || c.MetricsPassword != "s3cret" {
+		t.Errorf("env not applied: %q %q", c.MetricsListenAddr, c.MetricsPassword)
+	}
+
+	for name, args := range map[string][]string{
+		"invalid listen address":   {"-metrics-listen", "9090"},
+		"clashes with HTTP listen": {"-metrics-listen", ":8080"},
+		"listener with no-metrics": {"-no-metrics"},
+	} {
+		if _, err := config.Load(append(append([]string{}, base...), args...)); err == nil {
+			t.Errorf("%s: expected an error", name)
+		}
+	}
+}

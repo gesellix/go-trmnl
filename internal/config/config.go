@@ -59,6 +59,16 @@ type Config struct {
 	DisableEncryption bool
 	// DisableDeviceAuth opts out of Access-Token validation for devices.
 	DisableDeviceAuth bool
+	// DisableMetrics turns the Prometheus /metrics endpoint off.
+	DisableMetrics bool
+	// MetricsListenAddr moves /metrics to its own listener, e.g.
+	// "127.0.0.1:9090". Empty serves it on the regular listener(s).
+	MetricsListenAddr string
+	// MetricsUser and MetricsPassword guard /metrics with HTTP Basic Auth.
+	// They are separate from the admin credentials so a scraper does not need
+	// admin access; auth is disabled when MetricsPassword is empty.
+	MetricsUser     string
+	MetricsPassword string
 }
 
 // Load parses configuration from the given args (typically os.Args[1:]),
@@ -82,6 +92,10 @@ func Load(args []string) (*Config, error) {
 	secretKey := fs.String("secret-key", env("TRMNL_SECRET_KEY", ""), "Key to encrypt stored credentials at rest (default: a key auto-generated under the data dir)")
 	noEncryption := fs.Bool("no-encryption", envBool("TRMNL_NO_ENCRYPTION"), "Store credentials in plaintext instead of encrypting them")
 	noDeviceAuth := fs.Bool("no-device-auth", envBool("TRMNL_NO_DEVICE_AUTH"), "Disable Access-Token validation for devices")
+	noMetrics := fs.Bool("no-metrics", envBool("TRMNL_NO_METRICS"), "Disable the Prometheus /metrics endpoint")
+	metricsListen := fs.String("metrics-listen", env("TRMNL_METRICS_LISTEN", ""), "Serve /metrics on its own address (e.g. 127.0.0.1:9090) instead of the regular listener")
+	metricsUser := fs.String("metrics-user", env("TRMNL_METRICS_USER", "metrics"), "Username for /metrics Basic Auth")
+	metricsPass := fs.String("metrics-password", env("TRMNL_METRICS_PASSWORD", ""), "Password for /metrics Basic Auth (empty disables auth)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -113,6 +127,10 @@ func Load(args []string) (*Config, error) {
 		SecretKey:         *secretKey,
 		DisableEncryption: *noEncryption,
 		DisableDeviceAuth: *noDeviceAuth,
+		DisableMetrics:    *noMetrics,
+		MetricsListenAddr: strings.TrimSpace(*metricsListen),
+		MetricsUser:       *metricsUser,
+		MetricsPassword:   *metricsPass,
 	}
 
 	if c.PublicBaseURL == "" {
@@ -125,21 +143,40 @@ func Load(args []string) (*Config, error) {
 		c.UploadsDir = filepath.Join(c.DataDir, "uploads")
 	}
 
+	if err := c.validate(); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// validate checks the settings that only make sense in combination.
+func (c *Config) validate() error {
 	if u, err := url.Parse(c.PublicBaseURL); err != nil || !u.IsAbs() {
-		return nil, fmt.Errorf("base-url must be an absolute URL, got %q", c.PublicBaseURL)
+		return fmt.Errorf("base-url must be an absolute URL, got %q", c.PublicBaseURL)
 	}
 	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
-		return nil, fmt.Errorf("tls-cert and tls-key must be set together")
+		return fmt.Errorf("tls-cert and tls-key must be set together")
 	}
 	if c.HTTPSListenAddr == "" && (c.TLSCertFile != "" || len(c.TLSHosts) > 0) {
-		return nil, fmt.Errorf("tls-cert, tls-key and tls-hosts require https-listen")
+		return fmt.Errorf("tls-cert, tls-key and tls-hosts require https-listen")
 	}
 	if c.HTTPSListenAddr != "" {
 		if _, _, err := net.SplitHostPort(c.HTTPSListenAddr); err != nil {
-			return nil, fmt.Errorf("invalid https-listen %q: %w", c.HTTPSListenAddr, err)
+			return fmt.Errorf("invalid https-listen %q: %w", c.HTTPSListenAddr, err)
 		}
 	}
-	return c, nil
+	if c.DisableMetrics && (c.MetricsListenAddr != "" || c.MetricsPassword != "") {
+		return fmt.Errorf("metrics-listen and metrics-password conflict with no-metrics")
+	}
+	if c.MetricsListenAddr != "" {
+		if _, _, err := net.SplitHostPort(c.MetricsListenAddr); err != nil {
+			return fmt.Errorf("invalid metrics-listen %q: %w", c.MetricsListenAddr, err)
+		}
+		if c.MetricsListenAddr == c.ListenAddr || c.MetricsListenAddr == c.HTTPSListenAddr {
+			return fmt.Errorf("metrics-listen %q must differ from the other listen addresses", c.MetricsListenAddr)
+		}
+	}
+	return nil
 }
 
 // TLSDir is where the local CA and its server certificate are stored.
