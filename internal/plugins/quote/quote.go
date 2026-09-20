@@ -61,6 +61,9 @@ type Data struct {
 	Author      string
 	Attribution string // provider credit shown small in the footer
 	Label       string
+	// FooterReserve is horizontal space kept free at the bottom right for the
+	// server-drawn battery indicator; see plugins.RenderInput.
+	FooterReserveRight int
 }
 
 // DataModel fetches a quote from the configured provider.
@@ -110,6 +113,7 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	if !ok {
 		return nil, fmt.Errorf("quote: invalid data model")
 	}
+	d.FooterReserveRight = in.FooterReserveRight
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))
 	dc := gg.NewContextForRGBA(img)
 	dc.SetRGB(1, 1, 1)

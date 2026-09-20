@@ -84,7 +84,7 @@ func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *sto
 	if p, ok := plugins.Get(pluginRow.Type); ok {
 		ttl = p.DefaultRefresh()
 	}
-	if hash, ok := h.cachedHash(screen, ttl); ok {
+	if hash, ok := h.cachedHash(d, screen, ttl); ok {
 		return hash, nil
 	}
 
@@ -95,21 +95,44 @@ func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *sto
 	return res.Hash, nil
 }
 
-// cachedHash returns the screen's cached hash if it is still fresh and the file
-// is present on disk.
-func (h *Handler) cachedHash(screen *store.Screen, ttl time.Duration) (string, bool) {
-	if !screen.RenderedHash.Valid {
+// cachedHash returns the cached hash for this device's view of the screen, if
+// it is still fresh and the file is present on disk. A device drawing the
+// battery indicator sees its own image, so it has its own cache entry.
+func (h *Handler) cachedHash(d *store.Device, screen *store.Screen, ttl time.Duration) (string, bool) {
+	hash, renderedAt := "", int64(0)
+	if d != nil && d.ShowBattery {
+		cachedState, ok, err := 0, false, error(nil)
+		hash, renderedAt, cachedState, ok, err = h.store.DeviceScreenRender(d.ID, screen.ID)
+		if err != nil || !ok {
+			return "", false
+		}
+		// The indicator is part of the image, so a changed battery level has to
+		// invalidate the cache even while the plugin's refresh interval holds.
+		level, charging := screens.BatteryState(d)
+		if cachedState != render.BatteryState(level, charging) {
+			return "", false
+		}
+	} else {
+		if !screen.RenderedHash.Valid {
+			return "", false
+		}
+		hash = screen.RenderedHash.String
+		if screen.RenderedAt.Valid {
+			renderedAt = screen.RenderedAt.Int64
+		}
+	}
+	if hash == "" {
 		return "", false
 	}
-	if _, err := os.Stat(filepath.Join(h.uploadsDir, screen.RenderedHash.String+".bmp")); err != nil {
+	if _, err := os.Stat(filepath.Join(h.uploadsDir, hash+".bmp")); err != nil {
 		return "", false
 	}
-	if ttl > 0 && screen.RenderedAt.Valid {
-		if time.Since(time.Unix(screen.RenderedAt.Int64, 0)) >= ttl {
+	if ttl > 0 && renderedAt > 0 {
+		if time.Since(time.Unix(renderedAt, 0)) >= ttl {
 			return "", false
 		}
 	}
-	return screen.RenderedHash.String, true
+	return hash, true
 }
 
 // ditherMode reads the global dithering mode, defaulting to Floyd-Steinberg.

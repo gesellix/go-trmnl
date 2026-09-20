@@ -69,6 +69,9 @@ type Data struct {
 	Weather *weather.Data
 	Now     time.Time
 	Use24h  bool
+	// FooterReserve is horizontal space kept free at the bottom right for the
+	// server-drawn battery indicator; see plugins.RenderInput.
+	FooterReserveRight int
 }
 
 // DataModel fetches the merged agenda for the selected accounts and window.
@@ -140,6 +143,7 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	if !ok {
 		return nil, fmt.Errorf("familycalendar: unexpected data type %T", raw)
 	}
+	d.FooterReserveRight = in.FooterReserveRight
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))
 	dc := gg.NewContextForRGBA(img)
 	dc.SetRGB(1, 1, 1)

@@ -72,6 +72,6 @@ func drawQuote(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 		dc.DrawStringAnchored(d.Label, 40, fh-20, 0, 0.5)
 	}
 	if d.Attribution != "" {
-		dc.DrawStringAnchored(d.Attribution, fw-40, fh-20, 1, 0.5)
+		dc.DrawStringAnchored(d.Attribution, fw-40-float64(d.FooterReserveRight), fh-20, 1, 0.5)
 	}
 }

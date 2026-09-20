@@ -8,14 +8,16 @@ import (
 const deviceColumns = `id, mac, api_key, friendly_id, name, model, fw_version,
 	width, height, refresh_rate, playlist_id, playlist_cursor,
 	battery_voltage, battery_charging, rssi, wifi_status, last_seen_at, created_at,
-	firmware_update, firmware_url, reset_firmware, special_function, font_bundle`
+	firmware_update, firmware_url, reset_firmware, special_function, font_bundle,
+	show_battery`
 
 func scanDevice(row interface{ Scan(...any) error }) (*Device, error) {
 	var d Device
 	err := row.Scan(&d.ID, &d.MAC, &d.APIKey, &d.FriendlyID, &d.Name, &d.Model, &d.FWVersion,
 		&d.Width, &d.Height, &d.RefreshRate, &d.PlaylistID, &d.PlaylistCursor,
 		&d.BatteryVoltage, &d.BatteryCharging, &d.RSSI, &d.WifiStatus, &d.LastSeenAt, &d.CreatedAt,
-		&d.FirmwareUpdate, &d.FirmwareURL, &d.ResetFirmware, &d.SpecialFunction, &d.FontBundle)
+		&d.FirmwareUpdate, &d.FirmwareURL, &d.ResetFirmware, &d.SpecialFunction, &d.FontBundle,
+		&d.ShowBattery)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -106,12 +108,13 @@ func (s *Store) UpdateTelemetry(deviceID int64, t Telemetry) error {
 }
 
 // UpdateDeviceSettings updates the user-editable fields of a device.
-func (s *Store) UpdateDeviceSettings(id int64, name string, refreshRate int, playlistID sql.NullInt64, fontBundle string) error {
+func (s *Store) UpdateDeviceSettings(id int64, name string, refreshRate int, playlistID sql.NullInt64, fontBundle string, showBattery bool) error {
 	if fontBundle == "" {
 		fontBundle = "classic"
 	}
-	_, err := s.db.Exec(`UPDATE devices SET name = ?, refresh_rate = ?, playlist_id = ?, font_bundle = ? WHERE id = ?`,
-		name, refreshRate, playlistID, fontBundle, id)
+	_, err := s.db.Exec(`UPDATE devices SET name = ?, refresh_rate = ?, playlist_id = ?, font_bundle = ?,
+		show_battery = ? WHERE id = ?`,
+		name, refreshRate, playlistID, fontBundle, showBattery, id)
 	return err
 }
 

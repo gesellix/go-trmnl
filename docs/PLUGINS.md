@@ -43,6 +43,21 @@ from an `init()` in its package and blank-import that package in both
 `cmd/trmnld/main.go` and `cmd/trmnl-render/main.go`. The built-in
 [clock](plugins/clock.md) plugin is the simplest example to copy.
 
+### The battery indicator and your footer
+
+When a device has the battery indicator enabled, the server draws it in the
+bottom-right corner **after** the plugin has rendered, and passes
+`RenderInput.FooterReserveRight` (pixels) to say how much space to keep free
+there. A plugin that anchors something to the right edge of its footer should
+subtract it:
+
+```go
+dc.DrawStringAnchored(text, float64(w-in.FooterReserveRight)-15, float64(h)-15, 1, 0.5)
+```
+
+The value is zero unless the device has the indicator on, so ignoring it only
+matters for those devices, where the indicator would overlap.
+
 While developing, render your plugin straight to image files with the
 `trmnl-render` CLI:
 

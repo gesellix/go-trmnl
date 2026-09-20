@@ -79,6 +79,12 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 			"internal_server_error", "Failed to persist telemetry.", r.URL.Path, nil)
 		return
 	}
+	// The device was loaded before this poll's telemetry was stored. Anything
+	// rendered from it (the battery indicator) would otherwise be one poll
+	// behind.
+	if fresh, err := h.store.GetDeviceByID(d.ID); err == nil {
+		d = fresh
+	}
 
 	img := h.currentImage(r.Context(), d)
 

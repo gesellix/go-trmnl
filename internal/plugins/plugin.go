@@ -25,6 +25,11 @@ type RenderInput struct {
 	Height    int
 	AssetsDir string   // directory holding uploaded assets (for static images)
 	Fonts     *FontSet // resolved fonts for this render (nil falls back to Go fonts)
+	// FooterReserveRight is horizontal space a plugin must leave free at the
+	// bottom right, where the server draws the battery indicator afterwards.
+	// Plugins that anchor something to the right edge of their footer subtract
+	// it; everything else can ignore it.
+	FooterReserveRight int
 }
 
 // Plugin renders a screen. DataModel is split from Render so that network/IO

@@ -119,7 +119,7 @@ func drawLabel(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	setFace(dc, fs, 18, plugins.StyleSans)
 	dc.DrawStringAnchored(text, 40, float64(h)-20, 0, 0.5)
 	if d.Place != "" {
-		dc.DrawStringAnchored(d.Place, float64(w)-40, float64(h)-20, 1, 0.5)
+		dc.DrawStringAnchored(d.Place, float64(w-d.FooterReserveRight)-40, float64(h)-20, 1, 0.5)
 	}
 }
 
