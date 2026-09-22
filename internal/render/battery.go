@@ -10,7 +10,12 @@ import (
 const (
 	batteryWidth  = 34
 	batteryHeight = 16
-	batteryMargin = 15 // distance from the panel edges, matching the plugin footers
+	batteryMargin = 15 // distance from the right panel edge, matching the plugin footers
+	// batteryCenterY is the distance of the icon's vertical centre from the
+	// bottom edge. The device's bezel hides roughly the bottom ten pixels, so
+	// the icon sits higher than batteryMargin would put it, in line with the
+	// footer text of the built-in plugins.
+	batteryCenterY = 20
 
 	// BatteryFooterWidth is the horizontal space the indicator occupies,
 	// measured from the right edge of the panel: the icon with its right-hand
@@ -73,7 +78,7 @@ func DrawBatteryIndicator(img draw.Image, level BatteryLevel, charging bool) {
 	}
 	b := img.Bounds()
 	x1 := b.Max.X - batteryMargin
-	y1 := b.Max.Y - batteryMargin + batteryHeight/2
+	y1 := b.Max.Y - batteryCenterY + batteryHeight/2
 	x0 := x1 - batteryWidth
 	y0 := y1 - batteryHeight
 
@@ -81,8 +86,9 @@ func DrawBatteryIndicator(img draw.Image, level BatteryLevel, charging bool) {
 	paper := image.NewUniform(white)
 
 	// Clear the area first: the indicator sits on top of the plugin's output,
-	// and 1-bit dithering turns any overlap into noise.
-	draw.Draw(img, image.Rect(x0-3, y0-3, x1+6, y1+3), paper, image.Point{}, draw.Src)
+	// and 1-bit dithering turns any overlap into noise. Only a pixel above and
+	// below, so a footer rule drawn at h-30 stays intact.
+	draw.Draw(img, image.Rect(x0-3, y0-1, x1+6, y1+1), paper, image.Point{}, draw.Src)
 
 	// Outline, plus the nub on the right.
 	rect(img, ink, x0, y0, x1, y0+2)
