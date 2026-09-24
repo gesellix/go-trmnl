@@ -166,15 +166,18 @@ func drawFooter(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	dc.DrawLine(0, float64(h)-30, float64(w), float64(h)-30)
 	dc.Stroke()
 
+	// Kept clear of the bottom edge, which the device's bezel partly hides,
+	// and level with the battery indicator the server may draw on the right.
+	footerY := float64(h) - 22
 	setFace(dc, fs, 11, plugins.StyleSans)
-	dc.DrawStringAnchored("Letter in box = person · empty = all", 15, float64(h)-15, 0, 0.5)
+	dc.DrawStringAnchored("Letter in box = person · empty = all", 15, footerY, 0, 0.5)
 
 	timeFmt := "3:04 PM"
 	if d.Use24h {
 		timeFmt = "15:04"
 	}
 	updated := "Updated: " + d.Now.Format("Jan 2, 2006") + ", " + d.Now.Format(timeFmt)
-	dc.DrawStringAnchored(updated, float64(w-d.FooterReserveRight)-15, float64(h)-15, 1, 0.5)
+	dc.DrawStringAnchored(updated, float64(w-d.FooterReserveRight)-15, footerY, 1, 0.5)
 }
 
 type weatherCategory int
