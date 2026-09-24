@@ -1,9 +1,12 @@
 package admin
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gesellix/go-trmnl/internal/device"
+	"github.com/gesellix/go-trmnl/internal/playlist"
+	"github.com/gesellix/go-trmnl/internal/screens"
 )
 
 // DevicesList shows all registered devices.
@@ -122,7 +125,8 @@ func (h *Handler) DeviceFirmwareCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeviceForceRefresh clears the cached render of every screen in the device's
-// playlist so the next poll re-renders.
+// playlist and renders the screen the next poll will serve, so the device page
+// shows the new picture right away.
 func (h *Handler) DeviceForceRefresh(w http.ResponseWriter, r *http.Request) {
 	id, err := idParam(r, "id")
 	if err != nil {
@@ -143,6 +147,13 @@ func (h *Handler) DeviceForceRefresh(w http.ResponseWriter, r *http.Request) {
 	// Per-device renders are a separate cache; without this a device drawing
 	// the battery indicator would keep serving its old image.
 	_ = h.store.ClearDeviceRenders(d.ID)
+
+	// Best-effort: on failure the next poll renders, as it did before.
+	if sc, err := playlist.PeekScreen(h.store, d); err == nil {
+		if _, err := screens.Render(r.Context(), h.store, h.renderer, h.assetsDir, d, sc, h.ditherModeFor(sc)); err != nil {
+			log.Printf("admin: refresh render of screen %d for device %d: %v", sc.ID, d.ID, err)
+		}
+	}
 	http.Redirect(w, r, "/admin/devices/"+chiID(r), http.StatusFound)
 }
 

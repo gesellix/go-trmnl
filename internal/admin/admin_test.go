@@ -1,6 +1,7 @@
 package admin_test
 
 import (
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -251,5 +252,36 @@ func TestAdminHTTPSInfoAndCADownload(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != http.StatusNotFound {
 		t.Errorf("CA download without HTTPS: status %d, want 404", res.StatusCode)
+	}
+}
+
+func TestAdminForceRefreshRendersNextScreen(t *testing.T) {
+	ts, st := newAdminServer(t)
+
+	p, _ := st.CreatePlugin("clock", "c")
+	sc, _ := st.CreateScreen(p.ID, "c", "{}")
+	pl, _ := st.CreatePlaylist("default")
+	st.AddPlaylistItem(pl.ID, sc.ID)
+	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:10", APIKey: "k", FriendlyID: "F10"})
+	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", true); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := ts.Client().PostForm(ts.URL+"/admin/devices/"+itoa(d.ID)+"/refresh", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("refresh = %d, want 302", resp.StatusCode)
+	}
+
+	// The device page has something to show without waiting for a poll.
+	if _, ok, _ := st.LatestDeviceRender(d.ID); !ok {
+		t.Errorf("refresh did not render the device's next screen")
+	}
+	// Rendering for the page must not skip a screen on the device.
+	if got, _ := st.GetDeviceByID(d.ID); got.PlaylistCursor != d.PlaylistCursor {
+		t.Errorf("cursor = %d, want %d", got.PlaylistCursor, d.PlaylistCursor)
 	}
 }
