@@ -15,7 +15,7 @@ const (
 	// bottom edge. The device's bezel hides roughly the bottom ten pixels, so
 	// the icon sits higher than batteryMargin would put it, in line with the
 	// footer text of the built-in plugins.
-	batteryCenterY = 20
+	batteryCenterY = 18
 
 	// BatteryFooterWidth is the horizontal space the indicator occupies,
 	// measured from the right edge of the panel: the icon with its right-hand
