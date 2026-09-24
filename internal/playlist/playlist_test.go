@@ -53,3 +53,45 @@ func TestNextScreenNoPlaylist(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNoScreen", err)
 	}
 }
+
+func TestPeekScreenDoesNotAdvance(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	pl, _ := st.CreatePlaylist("default")
+	var screenIDs []int64
+	for _, name := range []string{"a", "b"} {
+		p, _ := st.CreatePlugin("clock", name)
+		sc, _ := st.CreateScreen(p.ID, name, "{}")
+		st.AddPlaylistItem(pl.ID, sc.ID)
+		screenIDs = append(screenIDs, sc.ID)
+	}
+
+	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:03", APIKey: "k", FriendlyID: "F3"})
+	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Peeking twice sees the same screen, and the next pick is that screen too.
+	for i := 0; i < 2; i++ {
+		d, _ = st.GetDeviceByID(d.ID)
+		sc, err := playlist.PeekScreen(st, d)
+		if err != nil {
+			t.Fatalf("peek %d: %v", i, err)
+		}
+		if sc.ID != screenIDs[0] {
+			t.Errorf("peek %d: screen %d, want %d", i, sc.ID, screenIDs[0])
+		}
+	}
+	d, _ = st.GetDeviceByID(d.ID)
+	sc, err := playlist.NextScreen(st, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sc.ID != screenIDs[0] {
+		t.Errorf("next: screen %d, want %d", sc.ID, screenIDs[0])
+	}
+}
