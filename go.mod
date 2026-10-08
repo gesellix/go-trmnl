@@ -12,7 +12,7 @@ require (
 	golang.org/x/image v0.46.0
 	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.300.0
-	modernc.org/sqlite v1.59.0
+	modernc.org/sqlite v1.60.1
 )
 
 require (
