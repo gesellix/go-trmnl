@@ -40,6 +40,12 @@ updates:
       actions-core:
         patterns:
           - "actions/*"
+      # init, analyze and upload-sarif are sub-actions of one repo and
+      # share a version; bump them together.
+      codeql:
+        patterns:
+          - "github/codeql-action"
+          - "github/codeql-action/*"
 
   - package-ecosystem: "docker"
     directory: "/"
