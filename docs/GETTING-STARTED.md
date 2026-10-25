@@ -29,7 +29,7 @@ Official TRMNL references:
   setup and which versions support BYOS.
 - A **host on the same LAN** as the device to run `go-trmnl` (a laptop, a NAS,
   a Raspberry Pi, etc.). The device must be able to reach this host directly.
-- Either **Go 1.26+** or **Docker** on that host.
+- Either **Go 1.27.3+** or **Docker** on that host.
 
 > The device fetches its screen image over plain HTTP from a URL this server
 > hands out, so the server must be reachable from the device on your network.
