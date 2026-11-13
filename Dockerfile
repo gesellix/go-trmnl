@@ -1,5 +1,5 @@
 # Build a static go-trmnl binary and ship it on a minimal distroless image.
-FROM golang:1.27.3 AS builder
+FROM golang:1.27.4 AS builder
 WORKDIR /src
 
 COPY go.mod go.sum ./
