@@ -37,13 +37,19 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 	}
 
 	battery := device != nil && device.ShowBattery
+
+	w, h := render.Width, render.Height
+	if device != nil {
+		w, h = device.Width, device.Height
+	}
+
 	in := plugins.RenderInput{
 		Device:    device,
 		Screen:    sc,
 		Settings:  json.RawMessage(sc.SettingsJSON),
 		Now:       time.Now(),
-		Width:     render.Width,
-		Height:    render.Height,
+		Width:     w,
+		Height:    h,
 		AssetsDir: assetsDir,
 		Fonts:     fonts,
 	}
