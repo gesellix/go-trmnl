@@ -7,7 +7,6 @@ package plugins
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"image"
 	"sort"
 	"sync"
@@ -64,7 +63,6 @@ func Register(p Plugin) {
 		panic("plugins: duplicate registration for type " + p.Type())
 	}
 	registry[p.Type()] = p
-	fmt.Printf("Registered plugin: %v -> %v\n", p.Type(), p.Title())
 }
 
 // Get returns the plugin registered for typ.
@@ -83,7 +81,6 @@ func All() []Plugin {
 	for _, p := range registry {
 		out = append(out, p)
 	}
-	fmt.Printf("ALL IS: %+v\n", out)
 	sort.Slice(out, func(i, j int) bool { return out[i].Type() < out[j].Type() })
 	return out
 }
