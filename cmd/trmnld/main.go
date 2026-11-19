@@ -41,6 +41,7 @@ import (
 	_ "github.com/gesellix/go-trmnl/internal/plugins/quote"
 	_ "github.com/gesellix/go-trmnl/internal/plugins/staticimage"
 	_ "github.com/gesellix/go-trmnl/internal/plugins/weather"
+	_ "github.com/gesellix/go-trmnl/internal/plugins/zectrix"
 )
 
 // version is the build version, overridden at release time via

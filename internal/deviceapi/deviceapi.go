@@ -70,7 +70,7 @@ func (h *Handler) currentImage(ctx context.Context, d *store.Device) screenImage
 		name, _ := h.ensurePlaceholder()
 		return screenImage{urlName: name, stem: trimExt(name)}
 	}
-	return screenImage{urlName: hash + ".bmp", stem: hash}
+	return screenImage{urlName: hash + ".png", stem: hash}
 }
 
 // renderScreen returns the content hash of the screen's current image,
