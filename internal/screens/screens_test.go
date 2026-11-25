@@ -55,3 +55,27 @@ func TestRenderUnknownPluginType(t *testing.T) {
 		t.Error("expected error for unknown plugin type")
 	}
 }
+
+func TestSizeBoundsDeviceReportedDimensions(t *testing.T) {
+	tests := []struct {
+		name         string
+		dev          *store.Device
+		wantW, wantH int
+	}{
+		{"preview", nil, render.Width, render.Height},
+		{"reported", &store.Device{Width: 400, Height: 300}, 400, 300},
+		{"bounds", &store.Device{Width: screens.MinSize, Height: screens.MaxSize}, screens.MinSize, screens.MaxSize},
+		{"huge", &store.Device{Width: 100000, Height: 100000}, render.Width, render.Height},
+		{"one huge", &store.Device{Width: 400, Height: 100000}, render.Width, render.Height},
+		{"zero", &store.Device{Width: 0, Height: 0}, render.Width, render.Height},
+		{"negative", &store.Device{Width: -800, Height: 480}, render.Width, render.Height},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, h := screens.Size(tt.dev)
+			if w != tt.wantW || h != tt.wantH {
+				t.Errorf("Size = %dx%d, want %dx%d", w, h, tt.wantW, tt.wantH)
+			}
+		})
+	}
+}

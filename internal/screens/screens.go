@@ -37,11 +37,7 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 	}
 
 	battery := device != nil && device.ShowBattery
-
-	w, h := render.Width, render.Height
-	if device != nil {
-		w, h = device.Width, device.Height
-	}
+	w, h := Size(device)
 
 	in := plugins.RenderInput{
 		Device:    device,
@@ -96,3 +92,23 @@ func BatteryState(d *store.Device) (render.BatteryLevel, bool) {
 	}
 	return level, d.BatteryCharging.Valid && d.BatteryCharging.Bool
 }
+
+// Panel size limits for device-reported dimensions. The firmware sends Width
+// and Height headers on every poll, and anyone holding a device's API key can
+// set them, so they are bounded before an image buffer is allocated from them.
+const (
+	MinSize = 64
+	MaxSize = 2048
+)
+
+// Size returns the canvas size to render for a device: the panel size it
+// reported, or the default 800x480 for previews (nil device) and for reported
+// sizes outside [MinSize, MaxSize].
+func Size(d *store.Device) (w, h int) {
+	if d == nil || !validSize(d.Width) || !validSize(d.Height) {
+		return render.Width, render.Height
+	}
+	return d.Width, d.Height
+}
+
+func validSize(v int) bool { return v >= MinSize && v <= MaxSize }
