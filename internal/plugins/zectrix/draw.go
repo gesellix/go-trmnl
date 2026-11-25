@@ -55,52 +55,72 @@ func setFace(dc *gg.Context, fs *plugins.FontSet, size float64, style plugins.Fo
 	}
 }
 
+// The layout is designed for a 400x300 panel. Other sizes scale it uniformly
+// by the factor that fits the canvas; the right-hand column and the footer stay
+// anchored to the right and bottom edges.
+const (
+	designWidth  = 400.0
+	designHeight = 300.0
+)
+
+// layout scales design coordinates and font sizes to the canvas.
+type layout struct {
+	k    float64 // scale factor from the design size
+	w, h float64 // canvas size
+}
+
+func newLayout(w, h int) layout {
+	fw, fh := float64(w), float64(h)
+	return layout{k: math.Min(fw/designWidth, fh/designHeight), w: fw, h: fh}
+}
+
+// s scales a design length.
+func (l layout) s(v float64) float64 { return v * l.k }
+
 // drawCurrent draws the top section: big icon + temperature, condition, and a
 // right-hand info column (feels-like, humidity, wind, sun times).
-func drawCurrent(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
+func drawCurrent(dc *gg.Context, fs *plugins.FontSet, d Data, l layout) {
 	cat, _ := codeInfo(d.Code)
-	fw := float64(w)
 
-	drawIcon(dc, cat, 60, 75, 40)
+	drawIcon(dc, cat, l.s(60), l.s(75), l.s(40))
 
 	dc.SetRGB(0, 0, 0)
-	setFace(dc, fs, 48, plugins.StyleTitle)
-	dc.DrawStringAnchored(fmt.Sprintf("%.0f°", d.Temp), 100, 60, 0, 0.5)
+	setFace(dc, fs, l.s(48), plugins.StyleTitle)
+	dc.DrawStringAnchored(fmt.Sprintf("%.0f°", d.Temp), l.s(100), l.s(60), 0, 0.5)
 
-	setFace(dc, fs, 24, plugins.StyleSans)
-	dc.DrawStringAnchored(d.CondLabel, 35, 120, 0, 0.5)
+	setFace(dc, fs, l.s(24), plugins.StyleSans)
+	dc.DrawStringAnchored(d.CondLabel, l.s(35), l.s(120), 0, 0.5)
 
 	// Right-hand info column, right-aligned.
-	rx := fw - 40
-	setFace(dc, fs, 18, plugins.StyleSans)
-	dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), rx, 30, 1, 0.5)
-	dc.DrawStringAnchored(fmt.Sprintf("Humidity %d%%", d.Humidity), rx, 30+25, 1, 0.5)
-	dc.DrawStringAnchored(fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), rx, 30+25*2, 1, 0.5)
+	rx := l.w - l.s(40)
+	setFace(dc, fs, l.s(18), plugins.StyleSans)
+	dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), rx, l.s(30), 1, 0.5)
+	dc.DrawStringAnchored(fmt.Sprintf("Humidity %d%%", d.Humidity), rx, l.s(30+25), 1, 0.5)
+	dc.DrawStringAnchored(fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), rx, l.s(30+25*2), 1, 0.5)
 	if d.Sunrise != "" || d.Sunset != "" {
-		dc.DrawStringAnchored(fmt.Sprintf("Sun %s - %s", d.Sunrise, d.Sunset), rx, 30+25*3, 1, 0.5)
+		dc.DrawStringAnchored(fmt.Sprintf("Sun %s - %s", d.Sunrise, d.Sunset), rx, l.s(30+25*3), 1, 0.5)
 	}
 }
 
 // drawForecast draws the Today/Tomorrow rows beneath a divider.
-func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
-	fw := float64(w)
+func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, l layout) {
 	dc.SetRGB(0, 0, 0)
-	dc.SetLineWidth(2)
-	dc.DrawLine(15, 150, fw-15, 150)
+	dc.SetLineWidth(l.s(2))
+	dc.DrawLine(l.s(15), l.s(150), l.w-l.s(15), l.s(150))
 	dc.Stroke()
 
 	y := 180.0
 	for _, day := range d.Days {
 		cat, cond := codeInfo(day.Code)
-		drawIcon(dc, cat, 35, y-6, 18)
+		drawIcon(dc, cat, l.s(35), l.s(y-6), l.s(18))
 
-		setFace(dc, fs, 16, plugins.StyleTitle)
-		dc.DrawStringAnchored(day.Heading, 55, y-18, 0, 0.5)
-		setFace(dc, fs, 14, plugins.StyleSans)
-		dc.DrawStringAnchored(cond, 55, y-2, 0, 0.5)
+		setFace(dc, fs, l.s(16), plugins.StyleTitle)
+		dc.DrawStringAnchored(day.Heading, l.s(55), l.s(y-18), 0, 0.5)
+		setFace(dc, fs, l.s(14), plugins.StyleSans)
+		dc.DrawStringAnchored(cond, l.s(55), l.s(y-2), 0, 0.5)
 
-		setFace(dc, fs, 14, plugins.StyleSans)
-		dc.DrawStringAnchored(fmt.Sprintf("UV %d | %d%% percip | L %.0f H %.0f", day.UV, day.PrecipPct, day.Lo, day.Hi), 170, y-8, 0, 0.5)
+		setFace(dc, fs, l.s(14), plugins.StyleSans)
+		dc.DrawStringAnchored(fmt.Sprintf("UV %d | %d%% percip | L %.0f H %.0f", day.UV, day.PrecipPct, day.Lo, day.Hi), l.s(170), l.s(y-8), 0, 0.5)
 
 		y += 48
 	}
@@ -108,16 +128,16 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 
 // drawLabel draws the footer: a left label and the place (with no time, which
 // the device does not provide here) on the right.
-func drawLabel(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
+func drawLabel(dc *gg.Context, fs *plugins.FontSet, d Data, l layout) {
 	text := d.Label
 	if text == "" {
 		text = "Weather"
 	}
 	dc.SetRGB(0, 0, 0)
-	setFace(dc, fs, 18, plugins.StyleSans)
-	dc.DrawStringAnchored(text, 40, float64(h)-20, 0, 0.5)
+	setFace(dc, fs, l.s(18), plugins.StyleSans)
+	dc.DrawStringAnchored(text, l.s(40), l.h-l.s(20), 0, 0.5)
 	if d.Place != "" {
-		dc.DrawStringAnchored(d.Place, float64(w-d.FooterReserveRight)-40, float64(h)-20, 1, 0.5)
+		dc.DrawStringAnchored(d.Place, l.w-float64(d.FooterReserveRight)-l.s(40), l.h-l.s(20), 1, 0.5)
 	}
 }
 

@@ -157,3 +157,20 @@ func TestRenderProducesPanel(t *testing.T) {
 		t.Errorf("bounds = %v, want 800x480", b)
 	}
 }
+
+func TestLayoutScalesFromDesignSize(t *testing.T) {
+	tests := []struct {
+		w, h  int
+		wantK float64
+	}{
+		{400, 300, 1},
+		{800, 480, 1.6}, // height-bound: 480/300
+		{800, 600, 2},
+		{296, 128, 128.0 / 300},
+	}
+	for _, tt := range tests {
+		if got := newLayout(tt.w, tt.h).k; got != tt.wantK {
+			t.Errorf("newLayout(%d, %d).k = %v, want %v", tt.w, tt.h, got, tt.wantK)
+		}
+	}
+}
