@@ -120,7 +120,7 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, l layout) {
 		dc.DrawStringAnchored(cond, l.s(55), l.s(y-2), 0, 0.5)
 
 		setFace(dc, fs, l.s(14), plugins.StyleSans)
-		dc.DrawStringAnchored(fmt.Sprintf("UV %d | %d%% percip | L %.0f H %.0f", day.UV, day.PrecipPct, day.Lo, day.Hi), l.s(170), l.s(y-8), 0, 0.5)
+		dc.DrawStringAnchored(fmt.Sprintf("UV %d | %d%% precip | L %.0f H %.0f", day.UV, day.PrecipPct, day.Lo, day.Hi), l.s(170), l.s(y-8), 0, 0.5)
 
 		y += 48
 	}
