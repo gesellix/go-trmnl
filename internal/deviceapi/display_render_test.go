@@ -153,3 +153,61 @@ func TestBatteryIndicatorRendersPerDevice(t *testing.T) {
 		t.Error("an empty battery drew the same image as a full one")
 	}
 }
+
+// pollFilename polls /api/display with the given extra headers and returns the
+// served image's content hash.
+func pollFilename(t *testing.T, ts *httptest.Server, d *store.Device, headers map[string]string) string {
+	t.Helper()
+	h := map[string]string{"ID": d.MAC, "Access-Token": d.APIKey}
+	for k, v := range headers {
+		h[k] = v
+	}
+	resp := do(t, ts, http.MethodGet, "/api/display", h, "")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var body struct {
+		Filename string `json:"filename"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Filename == "" || body.Filename == "placeholder" {
+		t.Fatalf("no screen rendered: filename = %q", body.Filename)
+	}
+	return body.Filename
+}
+
+// Devices with different panel sizes must not share the per-screen cache, or
+// one would be served an image rendered at the other's size.
+func TestPanelSizeRendersPerDevice(t *testing.T) {
+	ts, st, _ := newTestServerDir(t)
+	pl, _ := st.CreatePlaylist("default")
+	pg, _ := st.CreatePlugin("clock", "Clock")
+	sc, _ := st.CreateScreen(pg.ID, "Clock", `{"use_24h":true,"label":"Office"}`)
+	st.AddPlaylistItem(pl.ID, sc.ID)
+
+	small := provisionDevice(t, ts, st, "AA:BB:CC:DD:EE:31", pl.ID, false)
+	large := provisionDevice(t, ts, st, "AA:BB:CC:DD:EE:32", pl.ID, false)
+
+	smallName := pollFilename(t, ts, small, map[string]string{"Width": "400", "Height": "300"})
+	largeName := pollFilename(t, ts, large, map[string]string{"Width": "800", "Height": "480"})
+	if smallName == largeName {
+		t.Fatalf("both panel sizes got the same image %q", smallName)
+	}
+
+	// The small render must not have landed in the screen's shared cache.
+	got, _ := st.GetScreen(sc.ID)
+	if got.RenderedHash.String != largeName {
+		t.Errorf("shared rendered_hash = %q, want the 800x480 render %q", got.RenderedHash.String, largeName)
+	}
+
+	// Each device hits its own cache on the next poll.
+	if again := pollFilename(t, ts, small, nil); again != smallName {
+		t.Errorf("small device re-rendered or got the shared image: %q != %q", again, smallName)
+	}
+	if again := pollFilename(t, ts, large, nil); again != largeName {
+		t.Errorf("large device re-rendered: %q != %q", again, largeName)
+	}
+}

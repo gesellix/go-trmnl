@@ -68,9 +68,9 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 	if err != nil {
 		return render.Result{}, err
 	}
-	// A screen with the indicator looks different per device, so it cannot go
-	// into the shared per-screen cache.
-	if battery {
+	// A screen with the indicator or at a non-default size looks different per
+	// device, so it cannot go into the shared per-screen cache.
+	if PerDeviceCache(device) {
 		level, charging := BatteryState(device)
 		_ = st.SetDeviceScreenRender(device.ID, sc.ID, res.Hash, render.BatteryState(level, charging))
 	} else {
@@ -112,3 +112,22 @@ func Size(d *store.Device) (w, h int) {
 }
 
 func validSize(v int) bool { return v >= MinSize && v <= MaxSize }
+
+// PerDeviceCache reports whether a device's renders are specific to it and so
+// belong in the per-device cache instead of the screen's shared one: when it
+// draws the battery indicator, or when its panel is not the default size (the
+// shared entry is also written by size-less admin previews at 800x480).
+//
+// The per-device entry does not record the size it was rendered at. A device
+// that reports a new size keeps its cached image until the plugin's refresh
+// interval elapses or the cache is cleared via "Force refresh".
+func PerDeviceCache(d *store.Device) bool {
+	if d == nil {
+		return false
+	}
+	if d.ShowBattery {
+		return true
+	}
+	w, h := Size(d)
+	return w != render.Width || h != render.Height
+}

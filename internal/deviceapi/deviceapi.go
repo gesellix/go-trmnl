@@ -97,10 +97,11 @@ func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *sto
 
 // cachedHash returns the cached hash for this device's view of the screen, if
 // it is still fresh and the file is present on disk. A device drawing the
-// battery indicator sees its own image, so it has its own cache entry.
+// battery indicator or with a non-default panel size sees its own image, so it
+// has its own cache entry (see screens.PerDeviceCache).
 func (h *Handler) cachedHash(d *store.Device, screen *store.Screen, ttl time.Duration) (string, bool) {
 	hash, renderedAt := "", int64(0)
-	if d != nil && d.ShowBattery {
+	if screens.PerDeviceCache(d) {
 		cachedState, ok, err := 0, false, error(nil)
 		hash, renderedAt, cachedState, ok, err = h.store.DeviceScreenRender(d.ID, screen.ID)
 		if err != nil || !ok {
@@ -109,7 +110,7 @@ func (h *Handler) cachedHash(d *store.Device, screen *store.Screen, ttl time.Dur
 		// The indicator is part of the image, so a changed battery level has to
 		// invalidate the cache even while the plugin's refresh interval holds.
 		level, charging := screens.BatteryState(d)
-		if cachedState != render.BatteryState(level, charging) {
+		if d.ShowBattery && cachedState != render.BatteryState(level, charging) {
 			return "", false
 		}
 	} else {
