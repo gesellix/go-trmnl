@@ -211,3 +211,68 @@ func TestPanelSizeRendersPerDevice(t *testing.T) {
 		t.Errorf("large device re-rendered: %q != %q", again, largeName)
 	}
 }
+
+// A device set to PNG is served PNG everywhere: the placeholder from setup and
+// display, and rendered screens. Other devices stay on BMP.
+func TestImageFormatPerDevice(t *testing.T) {
+	ts, st, dir := newTestServerDir(t)
+
+	type served struct {
+		ImageURL string `json:"image_url"`
+		Filename string `json:"filename"`
+	}
+	get := func(path string, headers map[string]string) served {
+		t.Helper()
+		resp := do(t, ts, http.MethodGet, path, headers, "")
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200", path, resp.StatusCode)
+		}
+		var body served
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return body
+	}
+	// The served URL must name an existing file of the expected format.
+	checkFile := func(what string, body served, ext string) {
+		t.Helper()
+		if !strings.HasSuffix(body.ImageURL, "/"+body.Filename+ext) {
+			t.Errorf("%s: image_url %q, want %s%s", what, body.ImageURL, body.Filename, ext)
+		}
+		if _, err := os.Stat(filepath.Join(dir, body.Filename+ext)); err != nil {
+			t.Errorf("%s: served file missing: %v", what, err)
+		}
+	}
+
+	const pngMAC = "AA:BB:CC:DD:EE:41"
+	if _, _, err := device.Provision(st, pngMAC, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := st.GetDeviceByMAC(pngMAC)
+	if err := st.SetDeviceImageFormat(d.ID, store.ImagePNG); err != nil {
+		t.Fatal(err)
+	}
+	auth := map[string]string{"ID": pngMAC, "Access-Token": d.APIKey}
+
+	setup := get("/api/setup", map[string]string{"ID": pngMAC})
+	if setup.Filename != "placeholder" {
+		t.Fatalf("setup filename = %q, want placeholder", setup.Filename)
+	}
+	checkFile("setup", setup, ".png")
+	checkFile("display without screen", get("/api/display", auth), ".png")
+
+	pl, _ := st.CreatePlaylist("default")
+	pg, _ := st.CreatePlugin("clock", "Clock")
+	sc, _ := st.CreateScreen(pg.ID, "Clock", `{"use_24h":true}`)
+	st.AddPlaylistItem(pl.ID, sc.ID)
+	st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false)
+	rendered := get("/api/display", auth)
+	if rendered.Filename == "placeholder" {
+		t.Fatal("expected a rendered screen")
+	}
+	checkFile("rendered", rendered, ".png")
+
+	bmp := provisionDevice(t, ts, st, "AA:BB:CC:DD:EE:42", pl.ID, false)
+	checkFile("bmp device", get("/api/display", map[string]string{"ID": bmp.MAC, "Access-Token": bmp.APIKey}), ".bmp")
+}

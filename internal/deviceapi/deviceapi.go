@@ -19,9 +19,10 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// placeholderName is the filename of the fallback image served when a device
-// has no renderable screen yet.
-const placeholderName = "placeholder.bmp"
+// placeholderStem is the file stem of the fallback image served when a device
+// has no renderable screen yet. It exists in every format a device can be
+// served (placeholder.bmp, placeholder.png).
+const placeholderStem = "placeholder"
 
 // Handler bundles the dependencies of the device endpoints.
 type Handler struct {
@@ -52,8 +53,14 @@ func New(st *store.Store, baseURL, uploadsDir string, disableAuth bool) *Handler
 
 // screenImage holds the served image's URL filename and its bare stem.
 type screenImage struct {
-	urlName string // e.g. "<hash>.bmp" or "placeholder.bmp"
+	urlName string // e.g. "<hash>.bmp" or "placeholder.png"
 	stem    string // e.g. "<hash>" or "placeholder"
+}
+
+// placeholderImage returns the fallback image in the device's format.
+func (h *Handler) placeholderImage(d *store.Device) screenImage {
+	_ = h.ensurePlaceholder()
+	return screenImage{urlName: placeholderStem + d.ImageExt(), stem: placeholderStem}
 }
 
 // currentImage selects the device's next screen, renders it if needed, and
@@ -62,15 +69,13 @@ type screenImage struct {
 func (h *Handler) currentImage(ctx context.Context, d *store.Device) screenImage {
 	screen, err := playlist.NextScreen(h.store, d)
 	if err != nil { // ErrNoScreen or a store error: fall back gracefully
-		name, _ := h.ensurePlaceholder()
-		return screenImage{urlName: name, stem: trimExt(name)}
+		return h.placeholderImage(d)
 	}
 	hash, rerr := h.renderScreen(ctx, d, screen)
 	if rerr != nil {
-		name, _ := h.ensurePlaceholder()
-		return screenImage{urlName: name, stem: trimExt(name)}
+		return h.placeholderImage(d)
 	}
-	return screenImage{urlName: hash + ".png", stem: hash}
+	return screenImage{urlName: hash + d.ImageExt(), stem: hash}
 }
 
 // renderScreen returns the content hash of the screen's current image,
@@ -125,7 +130,8 @@ func (h *Handler) cachedHash(d *store.Device, screen *store.Screen, ttl time.Dur
 	if hash == "" {
 		return "", false
 	}
-	if _, err := os.Stat(filepath.Join(h.uploadsDir, hash+".bmp")); err != nil {
+	// The device fetches the file in its own format, so that one must exist.
+	if _, err := os.Stat(filepath.Join(h.uploadsDir, hash+d.ImageExt())); err != nil {
 		return "", false
 	}
 	if ttl > 0 && renderedAt > 0 {
@@ -153,13 +159,6 @@ func (h *Handler) ditherModeFor(sc *store.Screen) render.Mode {
 	return h.ditherMode()
 }
 
-func trimExt(name string) string {
-	if i := len(name) - len(filepath.Ext(name)); i >= 0 {
-		return name[:i]
-	}
-	return name
-}
-
 // Routes mounts the device endpoints onto r under /api.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
@@ -169,27 +168,38 @@ func (h *Handler) Routes(r chi.Router) {
 	})
 }
 
-// ensurePlaceholder writes the fallback image to the uploads directory once.
-func (h *Handler) ensurePlaceholder() (string, error) {
+// ensurePlaceholder writes the fallback image to the uploads directory once,
+// in every servable format. Files that already exist are kept, so an install
+// that only has placeholder.bmp gains placeholder.png on the next start.
+func (h *Handler) ensurePlaceholder() error {
 	h.placeholderOnce.Do(func() {
-		path := filepath.Join(h.uploadsDir, placeholderName)
-		if _, err := os.Stat(path); err == nil {
-			return
-		}
 		img := render.Placeholder([]string{
 			"go-trmnl",
 			"",
 			"Device registered. No screen assigned yet.",
 			"Add a screen in the admin UI.",
 		})
-		var buf bytes.Buffer
-		if err := render.EncodeBMP1(&buf, img); err != nil {
-			h.placeholderErr = err
-			return
+		encoders := map[string]func(*bytes.Buffer) error{
+			".bmp": func(buf *bytes.Buffer) error { return render.EncodeBMP1(buf, img) },
+			".png": func(buf *bytes.Buffer) error { return render.EncodePNG1(buf, img) },
 		}
-		h.placeholderErr = os.WriteFile(path, buf.Bytes(), 0o644)
+		for ext, encode := range encoders {
+			path := filepath.Join(h.uploadsDir, placeholderStem+ext)
+			if _, err := os.Stat(path); err == nil {
+				continue
+			}
+			var buf bytes.Buffer
+			if err := encode(&buf); err != nil {
+				h.placeholderErr = err
+				return
+			}
+			if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+				h.placeholderErr = err
+				return
+			}
+		}
 	})
-	return placeholderName, h.placeholderErr
+	return h.placeholderErr
 }
 
 func (h *Handler) imageURL(name string) string {

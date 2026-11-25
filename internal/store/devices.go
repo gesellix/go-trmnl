@@ -9,7 +9,7 @@ const deviceColumns = `id, mac, api_key, friendly_id, name, model, fw_version,
 	width, height, refresh_rate, playlist_id, playlist_cursor,
 	battery_voltage, battery_charging, rssi, wifi_status, last_seen_at, created_at,
 	firmware_update, firmware_url, reset_firmware, special_function, font_bundle,
-	show_battery`
+	show_battery, image_format`
 
 func scanDevice(row interface{ Scan(...any) error }) (*Device, error) {
 	var d Device
@@ -17,7 +17,7 @@ func scanDevice(row interface{ Scan(...any) error }) (*Device, error) {
 		&d.Width, &d.Height, &d.RefreshRate, &d.PlaylistID, &d.PlaylistCursor,
 		&d.BatteryVoltage, &d.BatteryCharging, &d.RSSI, &d.WifiStatus, &d.LastSeenAt, &d.CreatedAt,
 		&d.FirmwareUpdate, &d.FirmwareURL, &d.ResetFirmware, &d.SpecialFunction, &d.FontBundle,
-		&d.ShowBattery)
+		&d.ShowBattery, &d.ImageFormat)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -115,6 +115,13 @@ func (s *Store) UpdateDeviceSettings(id int64, name string, refreshRate int, pla
 	_, err := s.db.Exec(`UPDATE devices SET name = ?, refresh_rate = ?, playlist_id = ?, font_bundle = ?,
 		show_battery = ? WHERE id = ?`,
 		name, refreshRate, playlistID, fontBundle, showBattery, id)
+	return err
+}
+
+// SetDeviceImageFormat sets the image format served to the device. Anything
+// other than ImagePNG stores the default ImageBMP.
+func (s *Store) SetDeviceImageFormat(id int64, format string) error {
+	_, err := s.db.Exec(`UPDATE devices SET image_format = ? WHERE id = ?`, NormalizeImageFormat(format), id)
 	return err
 }
 

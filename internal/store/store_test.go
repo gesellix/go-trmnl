@@ -483,3 +483,60 @@ func TestRenderHashExists(t *testing.T) {
 		t.Errorf("per-device render not found: %v (err %v)", ok, err)
 	}
 }
+
+func TestDeviceImageFormat(t *testing.T) {
+	st := openTest(t)
+	d := newDevice(t, st, "AA:BB:CC:DD:EE:0A")
+	if d.ImageFormat != store.ImageBMP || d.ImageExt() != ".bmp" {
+		t.Fatalf("new device format = %q (%s), want bmp", d.ImageFormat, d.ImageExt())
+	}
+
+	if err := st.SetDeviceImageFormat(d.ID, store.ImagePNG); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.GetDeviceByID(d.ID); got.ImageFormat != store.ImagePNG || got.ImageExt() != ".png" {
+		t.Errorf("format = %q (%s), want png", got.ImageFormat, got.ImageExt())
+	}
+
+	// Unknown values fall back to BMP instead of being stored verbatim.
+	if err := st.SetDeviceImageFormat(d.ID, "gif"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.GetDeviceByID(d.ID); got.ImageFormat != store.ImageBMP {
+		t.Errorf("format = %q, want bmp", got.ImageFormat)
+	}
+}
+
+// A database created before migration 0009 keeps serving BMP to its devices.
+func TestMigrationImageFormatDefaultsExistingDevicesToBMP(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.db")
+	st, err := store.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Roll the schema back to before 0009, then add a device the old way.
+	for _, q := range []string{
+		`ALTER TABLE devices DROP COLUMN image_format`,
+		`DELETE FROM schema_migrations WHERE version = '0009_device_image_format.sql'`,
+		`INSERT INTO devices (mac, api_key, friendly_id, width, height, refresh_rate, created_at)
+			VALUES ('AA:BB:CC:DD:EE:0B', 'k', 'F0B', 800, 480, 900, unixepoch())`,
+	} {
+		if _, err := st.DB().Exec(q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	_ = st.Close()
+
+	st, err = store.Open(path)
+	if err != nil {
+		t.Fatalf("reopen (migrate): %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	d, err := st.GetDeviceByMAC("AA:BB:CC:DD:EE:0B")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.ImageFormat != store.ImageBMP {
+		t.Errorf("migrated device format = %q, want bmp", d.ImageFormat)
+	}
+}

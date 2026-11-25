@@ -29,6 +29,7 @@ func TestSweep(t *testing.T) {
 	}
 
 	write("placeholder.bmp", true)  // never pruned
+	write("placeholder.png", true)  // never pruned, in either format
 	write("aaaa.bmp", true)         // referenced -> kept
 	write("aaaa.png", true)         // referenced -> kept
 	write("bbbb.bmp", true)         // orphan, old -> removed
@@ -49,7 +50,7 @@ func TestSweep(t *testing.T) {
 		_, err := os.Stat(filepath.Join(dir, name))
 		return err == nil
 	}
-	for _, keep := range []string{"placeholder.bmp", "aaaa.bmp", "aaaa.png", "cccc.bmp", "assets/photo.png"} {
+	for _, keep := range []string{"placeholder.bmp", "placeholder.png", "aaaa.bmp", "aaaa.png", "cccc.bmp", "assets/photo.png"} {
 		if !exists(keep) {
 			t.Errorf("expected %s to be kept", keep)
 		}

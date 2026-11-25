@@ -55,6 +55,13 @@
     Battery indicator in the screen footer
     <p class="muted" style="margin-top: 0; font-size: 0.9em;">Draws a four-step battery symbol in the bottom right of every screen this device shows. It changes only when the level changes, so cached images and e-ink refreshes are unaffected.</p>
   </label>
+  <label>Image format
+    <select name="image_format">
+      <option value="bmp" {{if ne $d.ImageFormat "png"}}selected{{end}}>BMP (TRMNL firmware)</option>
+      <option value="png" {{if eq $d.ImageFormat "png"}}selected{{end}}>PNG</option>
+    </select>
+    <p class="muted" style="margin-top: 0; font-size: 0.9em;">File format of the images this device downloads. Keep BMP unless the device only decodes PNG.</p>
+  </label>
   <label>Special function
     {{$fn := def "none" (ns $d.SpecialFunction)}}
     <select name="special_function">

@@ -91,6 +91,10 @@ func (h *Handler) DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := h.store.SetDeviceImageFormat(id, r.FormValue("image_format")); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if fn := r.FormValue("special_function"); fn != "" {
 		_ = h.store.SetSpecialFunction(id, fn)
 	}

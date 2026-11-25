@@ -14,8 +14,10 @@ import (
 	"time"
 )
 
-// Placeholder is the fallback image filename, which is never pruned.
-const Placeholder = "placeholder.bmp"
+// Placeholder is the file stem of the fallback image, which is never pruned in
+// any format (placeholder.bmp, placeholder.png). It is written once per process
+// start, so a pruned copy would stay missing until a restart.
+const Placeholder = "placeholder"
 
 // Sweep removes files directly in dir whose name stem is not in keep, that are
 // not the placeholder, and that were last modified before now-olderThan.
@@ -34,7 +36,7 @@ func Sweep(dir string, keep map[string]bool, olderThan time.Duration) (int, erro
 
 	removed := 0
 	for _, e := range entries {
-		if e.IsDir() || e.Name() == Placeholder {
+		if e.IsDir() || stem(e.Name()) == Placeholder {
 			continue
 		}
 		if keep[stem(e.Name())] {

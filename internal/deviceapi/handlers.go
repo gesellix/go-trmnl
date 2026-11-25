@@ -42,13 +42,13 @@ func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name, _ := h.ensurePlaceholder()
+	img := h.placeholderImage(d)
 	httpx.WriteJSON(w, http.StatusOK, setupResponse{
 		Status:     http.StatusOK,
 		APIKey:     d.APIKey,
 		FriendlyID: d.FriendlyID,
-		ImageURL:   h.imageURL(name),
-		Filename:   strings.TrimSuffix(name, ".bmp"),
+		ImageURL:   h.imageURL(img.urlName),
+		Filename:   img.stem,
 		Message:    "Welcome to go-trmnl!",
 	})
 }

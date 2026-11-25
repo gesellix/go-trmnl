@@ -30,6 +30,28 @@ type Device struct {
 	FontBundle      string
 	// ShowBattery draws a battery indicator in the rendered screen's footer.
 	ShowBattery bool
+	// ImageFormat is the file format served to the device: ImageBMP or ImagePNG.
+	ImageFormat string
+}
+
+// Image formats a device can be served.
+const (
+	ImageBMP = "bmp"
+	ImagePNG = "png"
+)
+
+// NormalizeImageFormat maps a stored or submitted format to a supported one,
+// defaulting to ImageBMP, which every TRMNL firmware decodes.
+func NormalizeImageFormat(format string) string {
+	if format == ImagePNG {
+		return ImagePNG
+	}
+	return ImageBMP
+}
+
+// ImageExt returns the file extension, with dot, of the device's image format.
+func (d *Device) ImageExt() string {
+	return "." + NormalizeImageFormat(d.ImageFormat)
 }
 
 // DeviceLog is a single log entry reported by a device.
